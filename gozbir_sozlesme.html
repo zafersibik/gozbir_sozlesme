@@ -225,14 +225,14 @@
   <!-- ===== YENİ SÖZLEŞME ===== -->
   <div class="panel active" id="panel-yeni">
     <div class="card">
-      <h2>1. Kampanya Seç</h2>
+      <h2>Kampanya Seç</h2>
       <div class="camp-grid" id="campGrid"></div>
     </div>
 
     <div class="card" id="card-detay" style="display:none"></div>
 
     <div class="card" id="card-musteri" style="display:none">
-      <h2>3. Müşteri Bilgileri</h2>
+      <h2>Müşteri Bilgileri</h2>
       <div class="field">
         <label>Alıcı Ünvanı (listeden aramak için ünvan veya cari kodu yazın)</label>
         <input type="text" id="c_unvan" autocomplete="off" placeholder="Ünvan veya cari kodu">
@@ -250,7 +250,7 @@
     </div>
 
     <div class="card" id="card-odeme" style="display:none">
-      <h2>4. Ödeme ve Tarih</h2>
+      <h2>Ödeme ve Tarih</h2>
       <div class="field">
         <label>Sözleşme Tarihi</label>
         <input type="date" id="o_tarih">
@@ -561,7 +561,7 @@ function renderDetay() {
   const c = curCamp(); const el = $('card-detay');
   if (!c) { el.style.display = 'none'; return; }
   el.style.display = 'block';
-  let h = `<h2>2. ${c.code} — ${esc(c.name)}</h2>`;
+  let h = `<h2>${c.code} — ${esc(c.name)}</h2>`;
   c.steps.forEach((st, i) => {
     const ready = c.steps.slice(0, i).every(x => S.sel[x.key]);
     const opts = ready ? st.opts(S.sel) : [];
@@ -718,7 +718,7 @@ $('c_adres').addEventListener('input', e => { S.adres = e.target.value; });
 function validate() {
   const c = curCamp();
   if (!c) return 'Önce bir kampanya seçin.';
-  if (!c.steps.every(s => S.sel[s.key]) || !S.rows.length) return 'Kampanya detaylarını (2. adım) tamamlayın.';
+  if (!c.steps.every(s => S.sel[s.key]) || !S.rows.length) return 'Kampanya bölümündeki seçimleri tamamlayın.';
   if (!String(S.unvan).trim()) return 'Alıcı ünvanını girin.';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(S.tarih || '')) return 'Sözleşme tarihini seçin.';
   if (S.num && (!(S.num.aylik > 0) || !(S.num.ay > 0))) return 'Aylık ödeme ve ay değerleri sıfırdan büyük olmalı.';
