@@ -232,6 +232,19 @@
   .slotrow input[data-nf="int"], .slotrow input[data-nf="pct"] { width: 84px; }
   .odt-erow input[data-nf] { padding: 8px 6px; font-size: 0.85rem; width: 100%; }
   .nfprev { margin-top: 4px; }
+  .custom-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; margin: 10px 0; border: 1.5px solid var(--accent); border-radius: 10px; background: var(--accent-light); cursor: pointer; }
+  .custom-opt.on { border-width: 2px; padding: 9.5px 11.5px; }
+  .custom-opt input[type="checkbox"] { margin-top: 2px; }
+  .custom-opt b { display: block; color: var(--accent); font-size: 0.95rem; }
+  .custom-opt small { display: block; color: var(--text-muted); font-size: 0.75rem; margin-top: 2px; }
+  .odt-tot { background: var(--accent-light); border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: 0.85rem; }
+  .odt-tot .rowk { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .odt-tot .ok { color: var(--accent); }
+  .odt-tot .bad { color: var(--danger); }
+  .odt-cnt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .odt-cnt label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; margin: 0; }
+  .odt-cnt input[data-nf] { width: 70px; flex: none; }
+  .odt-cnt .btn { font-size: 0.78rem; padding: 10px 8px; }
   #printArea { display: none; }
   #toast {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -561,7 +574,7 @@ function resetState() {
   Object.assign(S, { campId: null, sel: {}, rows: [], num: null, plan: null, annex: null, ek: '', custom: false,
     hediyeTutar: '', odeme: 'Sıralı Evrak', evrak: '', tarih: todayISO(), unvan: '', kod: '', adres: '', savedId: null, savedSig: null,
     baslangic: todayISO(), ilkVade: addDaysIso(todayISO(), 30), baslangicEdited: false, ilkEdited: false,
-    odt: null, odtSkip: false, odtEdit: false, odtSel: [], ekAciklama: '', orig: null, hediyeManual: false });
+    odt: null, odtSkip: false, odtEdit: false, odtSel: [], ekAciklama: '', orig: null, hediyeManual: false, odtLocked: [] });
 }
 resetState();
 let curModel = null, curLayout = null, prevPanel = 'yeni', fromSaved = false, curSig = null;
@@ -675,8 +688,9 @@ function nfApply(el) {
   else if (b.indexOf('plan.') === 0) { if (d && v > 0) S.plan.lines[+b.slice(5)].aylik = v; else valid = false; }
   else if (b === 'hediye') { S.hediyeTutar = d ? String(v) : ''; S.hediyeManual = true; const hn = $('hediyeNot'); if (hn) hn.innerHTML = hediyeNot(); }
   else if (b.indexOf('odt.') === 0) {
-    if (S.odt && d && v >= 0) { S.odt.lines[+b.slice(4)].tutar = v; S.odt.manual = true; updateOdtWarn(); } else valid = false;
+    if (S.odt && d && v >= 0) { const oi = +b.slice(4); S.odt.lines[oi].tutar = v; S.odt.manual = true; if (S.odtLocked.indexOf(oi) === -1) S.odtLocked.push(oi); updateOdtWarn(); } else valid = false;
   }
+  else if (b === 'odtcount') { /* yalnızca giriş; düğmeye basınca okunur */ }
   else if (b.indexOf('row.') === 0) {
     const ri = +b.split('.')[1];
     if (composeRow(ri)) { if (/^(\d+\. )?Hediye Ürün Adı$/.test(S.rows[ri].l)) refreshHediye(); } else valid = false;
@@ -793,7 +807,7 @@ function scrollToCard(el) {
 }
 function selectCamp(id) {
   S.campId = id; S.sel = {}; S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.hediyeManual = false; S.orig = null; S.ekAciklama = '';
-  S.savedId = null; S.savedSig = null; S.odt = null; S.odtSkip = false; S.odtEdit = false; S.odtSel = [];
+  S.savedId = null; S.savedSig = null; S.odt = null; S.odtSkip = false; S.odtEdit = false; S.odtSel = []; S.odtLocked = [];
   renderCamps(); renderDetay(); renderOdeme();
   ['card-musteri', 'card-odeme', 'card-aksiyon'].forEach(i => { $(i).style.display = 'block'; });
   $('err').style.display = 'none';
@@ -817,7 +831,7 @@ function renderDetay() {
     if (S.rows.some(r => r.k === 'hediyeTutar')) {
       h += `<div class="field nfgrp" style="margin-top:10px"><label>Hediye Ürün Tutarı (₺)</label>${nfInput('money', 'hediye', S.hediyeTutar === '' ? '' : numDisp(S.hediyeTutar))}<div class="muted nfprev" style="display:none"></div><div class="muted" id="hediyeNot" style="margin-top:4px">${hediyeNot()}</div></div>`;
     }
-    h += `<label class="chk"><input type="checkbox" id="chkCustom"${S.custom ? ' checked' : ''}> Tablo dışı özel değer gireceğim</label><div id="customBox"></div>`;
+    h += `<label class="custom-opt${S.custom ? ' on' : ''}"><input type="checkbox" id="chkCustom"${S.custom ? ' checked' : ''}><span><b>Anlaşmayı Özelleştir</b><small>İskonto, adet ve tutarlar değiştirilebilir.</small></span></label><div id="customBox"></div>`;
   }
   el.innerHTML = h;
   refreshSummary(); renderCustom();
@@ -825,7 +839,7 @@ function renderDetay() {
 $('card-detay').addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.step) onStep(t.dataset.step, t.value);
-  else if (t.id === 'chkCustom') { S.custom = t.checked; renderCustom(); }
+  else if (t.id === 'chkCustom') { S.custom = t.checked; const lb = t.closest('label'); if (lb) lb.classList.toggle('on', t.checked); renderCustom(); }
 });
 $('card-detay').addEventListener('click', e => {
   if (e.target.closest('[data-hediye-auto]')) { S.hediyeManual = false; refreshHediye(); refreshSummary(); }
@@ -874,7 +888,7 @@ function renderCustom() {
   const box = $('customBox'); if (!box) return;
   if (!S.custom) { box.innerHTML = ''; return; }
   slotMap = {};
-  let h = '<div class="muted" style="margin-bottom:8px">Yalnızca rakamlar değiştirilebilir. Tutarlarda 1.000\'den küçük bir sayıyı virgülsüz yazarsanız bin olarak kabul edilir (50 → 50.000 ₺). 1.000 ₺\'den küçük gerçek bir tutar için virgül kullanın (500,00). Bu sözleşme kayıtlarda "özel değer" olarak işaretlenir.</div>';
+  let h = '<div class="muted" style="margin-bottom:8px">Yalnızca rakamlar değiştirilebilir. Tutarlarda 1.000\'den küçük bir sayıyı virgülsüz yazarsanız bin olarak kabul edilir (50 → 50.000 ₺). 1.000 ₺\'den küçük gerçek bir tutar için virgül kullanın (500,00). Bu sözleşme kayıtlarda "özelleştirilmiş" olarak işaretlenir.</div>';
   h += `<div class="field"><label>Ek Fayda Açıklaması (isteğe bağlı)</label><textarea data-aciklama="1" placeholder="örn. 10 adet fazla Hybrid, fuar anlaşması">${esc(S.ekAciklama)}</textarea></div>`;
   const grp = (label, inner) => `<div class="field nfgrp"><label>${label}</label><div class="slotrow">${inner}</div><div class="muted nfprev" style="display:none"></div></div>`;
   if (S.num) {
@@ -902,9 +916,13 @@ function resolveRows() {
   S.rows.forEach(r => {
     if (!r.k) { out.push([r.l, r.v]); return; }
     switch (r.k) {
-      case 'aylik': out.push([r.l, TL(S.num.aylik)]); break;
-      case 'toplam': out.push([r.l, TL(S.num.aylik * S.num.ay) + ' (' + S.num.ay + ' ay)']); break;
-      case 'toplamPlan': { const t = planTotals(S.plan); out.push([r.l, TL(t.toplam) + ' (' + t.ay + ' ay)']); break; }
+      case 'aylik': {
+        if (S.odt) { const L = S.odt.lines; out.push([r.l, L.every(x => x.tutar === L[0].tutar) ? money(L[0].tutar) : 'Değişken, ekteki ödeme tablosunda gösterilmiştir.']); }
+        else out.push([r.l, TL(S.num.aylik)]);
+        break;
+      }
+      case 'toplam': out.push([r.l, S.odt ? money(agreementTotal()) + ' (' + S.odt.lines.length + ' ödeme)' : TL(S.num.aylik * S.num.ay) + ' (' + S.num.ay + ' ay)']); break;
+      case 'toplamPlan': { const t = planTotals(S.plan); out.push([r.l, S.odt ? money(t.toplam) + ' (' + S.odt.lines.length + ' ödeme)' : TL(t.toplam) + ' (' + t.ay + ' ay)']); break; }
       case 'odeme': out.push([r.l, odemeTxt]); break;
       case 'evrak': if (sicil && String(S.evrak).trim()) out.push([r.l, String(S.evrak).trim()]); break;
       case 'hediyeTutar': if (String(S.hediyeTutar).trim()) out.push([r.l, fmtTutar(S.hediyeTutar)]); break;
@@ -983,6 +1001,25 @@ function genOdt() {
   else if (S.num) for (let i = 0; i < Math.round(S.num.ay); i++) amounts.push(S.num.aylik);
   return amounts.map((t, i) => ({ tarih: addMonthsIso(S.ilkVade, i), tutar: t, k: 1 }));
 }
+const round2 = n => Math.round(n * 100) / 100;
+const agreementMonths = () => (S.plan ? planTotals(S.plan).ay : (S.num ? S.num.ay : 12));
+const odtMaxDate = () => addMonthsIso(S.ilkVade, Math.max(1, agreementMonths()) - 1);
+/* Tutarı n kişiye 1.000 TL'lik birimlerle dağıtır; bölünmeyen birimler ve 1.000'den küçük artık ilk aylara eklenir */
+function dagit(amount, n) {
+  const unit = 1000, units = Math.floor(amount / unit), per = Math.floor(units / n), rem = units % n;
+  const res = new Array(n).fill(per * unit);
+  for (let i = 0; i < rem; i++) res[i] += unit;
+  res[0] = round2(res[0] + (amount - units * unit));
+  return res;
+}
+function groupText(deltas, sign) {
+  const m = new Map(); deltas.forEach(d => { if (d > 0) m.set(d, (m.get(d) || 0) + 1); });
+  return Array.from(m).map(kv => kv[1] + ' aya ' + (sign > 0 ? '+' : '−') + money(kv[0])).join(', ');
+}
+function groupAmt(vals) {
+  const m = new Map(); vals.forEach(d => m.set(d, (m.get(d) || 0) + 1));
+  return Array.from(m).map(kv => kv[1] + ' × ' + money(kv[0])).join(', ');
+}
 function syncEvrak() {
   if (!S.odt) return;
   S.evrak = String(S.odt.lines.length);
@@ -995,7 +1032,7 @@ function createTable(silent) {
   if (S.num && !(S.num.aylik > 0 && S.num.ay >= 1 && S.num.ay <= 120)) { toast('Aylık ödeme ve ay değerlerini kontrol edin.'); return false; }
   const lines = genOdt();
   if (!lines.length || lines.length > 120) { toast('Ödeme sayısı geçersiz.'); return false; }
-  S.odt = { lines, sig: odtParamsSig(), manual: false }; S.odtSkip = false; S.odtEdit = false; S.odtSel = [];
+  S.odt = { lines, sig: odtParamsSig(), manual: false }; S.odtSkip = false; S.odtEdit = false; S.odtSel = []; S.odtLocked = [];
   syncEvrak(); renderOdt(); refreshSummary();
   const ei = $('o_evrak'); if (ei) ei.readOnly = true;
   if (!silent) toast('Ödeme tablosu oluşturuldu.');
@@ -1006,9 +1043,10 @@ function updateOdtWarn() {
   if (!S.odt) { w.innerHTML = ''; return; }
   let h = '';
   if (odtStale()) h += '<div class="warn">Tablo güncel değil: kampanya, tutar, ay sayısı, ödeme çeşidi veya tarih değişti. "Yeniden Oluştur" ile güncelleyin.</div>';
-  const t = odtTotal(S.odt.lines), a = agreementTotal(), d = Math.round((t - a) * 100) / 100;
-  h += d === 0 ? `<div class="muted">Tablo toplamı: ${money(t)} (anlaşma toplamıyla uyumlu)</div>`
-    : `<div class="warn">Tablo toplamı ${money(t)}, anlaşma toplamı ${money(a)}. Fark: ${money(Math.abs(d))} ${d > 0 ? 'fazla' : 'eksik'}.</div>`;
+  const t = odtTotal(S.odt.lines), a = agreementTotal(), d = round2(t - a);
+  h += `<div class="odt-tot"><div class="rowk"><span>Anlaşma Toplamı</span><b>${money(a)}</b></div>` +
+    `<div class="rowk"><span>Tablo Toplamı (${S.odt.lines.length} ödeme)</span><b>${money(t)}</b></div>` +
+    `<div class="rowk"><span>Dağıtılacak Fark</span>` + (d === 0 ? '<b class="ok">Yok (uyumlu)</b>' : `<b class="bad">${money(Math.abs(d))} ${d > 0 ? 'fazla' : 'eksik'}</b>`) + '</div></div>';
   w.innerHTML = h;
 }
 function renderOdt() {
@@ -1028,11 +1066,51 @@ function renderOdt() {
   } else {
     h += '<div class="muted" style="margin-bottom:6px">Tarih ve tutarları değiştirebilir, satır ekleyip silebilir, birleştirmek istediğiniz ödemeleri işaretleyip "Seçili Ödemeleri Birleştir"e basabilirsiniz. Tutarlarda 1.000\'den küçük bir sayıyı virgülsüz yazarsanız bin olarak kabul edilir (50 → 50.000 ₺).</div>';
     h += '<div class="odt-bar"><button type="button" class="btn secondary" data-odt="ekle">Satır Ekle</button><button type="button" class="btn secondary" data-odt="birlestir">Seçili Ödemeleri Birleştir</button></div>';
+    h += '<div class="odt-bar"><button type="button" class="btn secondary" data-odt="dagit">Farkı Dağıt</button><button type="button" class="btn secondary" data-odt="cikar">Seçili Ayları Çıkar ve Dağıt</button></div>';
+    if (S.num && !S.plan) h += `<div class="odt-cnt"><label>Ödeme Sayısı</label>${nfInput('int', 'odtcount', String(S.odt.lines.length))}<button type="button" class="btn secondary" data-odt="sayi">Ödeme Sayısını Değiştir</button></div>`;
+    h += '<div class="muted" style="margin:4px 0 8px">Bir ayın tutarını değiştirdikten sonra "Farkı Dağıt" ile farkı işaretli aylara (işaretli yoksa az önce değiştirmediğiniz aylara) 1.000 ₺ birimleriyle yayabilirsiniz. Ödemeler anlaşma süresinin dışına çıkamaz.</div>';
     h += '<div class="odt-ehead"><span>Seç</span><span>No</span><span>Tarih</span><span>Tutar (₺)</span><span></span></div>';
     h += S.odt.lines.map((l, i) => `<div class="odt-erow"><input type="checkbox" data-osel="${i}"${S.odtSel.indexOf(i) > -1 ? ' checked' : ''} aria-label="Seç"><span class="odt-no">${esc(lab[i])}</span><input type="date" data-oi="${i}" data-of="tarih" value="${esc(l.tarih)}">${nfInput('money', 'odt.' + i, numDisp(l.tutar))}<button type="button" class="btn danger" data-odt="sil" data-i="${i}" aria-label="Satırı sil">×</button></div>`).join('');
   }
   box.innerHTML = h;
   updateOdtWarn();
+}
+function odtApply(lines, msg) {
+  S.odt.lines = lines; S.odt.manual = true; S.odtSel = []; S.odtLocked = [];
+  syncEvrak(); renderOdt(); refreshSummary(); toast(msg);
+}
+function odtDagit() {
+  const L = S.odt.lines, D = round2(agreementTotal() - odtTotal(L));
+  if (D === 0) { toast('Dağıtılacak fark yok.'); return; }
+  let tg = S.odtSel.slice().sort((x, y) => x - y);
+  if (!tg.length) { tg = L.map((l, i) => i).filter(i => S.odtLocked.indexOf(i) === -1); if (!tg.length) tg = L.map((l, i) => i); }
+  const sign = D > 0 ? 1 : -1, d = dagit(Math.abs(D), tg.length);
+  if (sign < 0 && tg.some((ti, i) => round2(L[ti].tutar - d[i]) <= 0)) { toast('Bir ayın tutarı sıfırın altına düşer. Daha çok ay işaretleyin veya farkı başka aylara yayın.'); return; }
+  askModal({ title: 'Fark dağıtılsın mı?', text: 'Fark ' + money(Math.abs(D)) + (sign > 0 ? ' (eksik)' : ' (fazla)') + ', ' + tg.length + ' aya dağıtılacak: ' + groupText(d, sign) + '. Onaylıyor musunuz?',
+    left: { label: 'Vazgeç' },
+    right: { label: 'Dağıt', fn: () => { const nl = L.map(l => Object.assign({}, l)); tg.forEach((ti, i) => { nl[ti].tutar = round2(nl[ti].tutar + sign * d[i]); }); odtApply(nl, 'Fark dağıtıldı.'); } } });
+}
+function odtCikar() {
+  const L = S.odt.lines, idx = S.odtSel.slice().sort((x, y) => x - y);
+  if (!idx.length) { toast('Çıkarılacak ayları işaretleyin.'); return; }
+  if (idx.length >= L.length) { toast('Tabloda en az bir ödeme kalmalı.'); return; }
+  const lab = odtLabels(L), removed = round2(idx.reduce((a, i) => a + (+L[i].tutar || 0), 0));
+  const rest = L.filter((l, i) => idx.indexOf(i) === -1).map(l => Object.assign({}, l));
+  const d = dagit(removed, rest.length);
+  askModal({ title: 'Aylar çıkarılıp dağıtılsın mı?', text: idx.map(i => lab[i] + '.').join(', ') + ' ödeme (' + money(removed) + ') tablodan çıkarılacak, tutarı kalan ' + rest.length + ' aya dağıtılacak: ' + groupText(d, 1) + '. Ödeme tarihleri değişmez. Onaylıyor musunuz?',
+    left: { label: 'Vazgeç' },
+    right: { label: 'Çıkar ve Dağıt', danger: true, fn: () => { rest.forEach((l, i) => { l.tutar = round2(l.tutar + d[i]); }); odtApply(rest, 'Aylar çıkarıldı, tutar dağıtıldı.'); } } });
+}
+function odtSayi() {
+  const el = document.querySelector('[data-bind="odtcount"]'); const n = el ? Math.round(nfValue(el.value)) : NaN;
+  const am = agreementMonths(), cur = S.odt.lines.length;
+  if (!(n >= 1)) { toast('Geçerli bir ödeme sayısı yazın.'); return; }
+  if (n > am) { toast(`Ödeme sayısı anlaşmanın ay sayısından (${am}) fazla olamaz. Süreyi uzatmak için Anlaşmayı Özelleştir'den ay sayısını değiştirin.`); return; }
+  if (n === cur) { toast('Ödeme sayısı zaten ' + n + '.'); return; }
+  const total = agreementTotal(), d = dagit(total, n);
+  askModal({ title: 'Ödeme sayısı değiştirilsin mi?', text: 'Ödeme sayısı ' + cur + ' → ' + n + '. Toplam ' + money(total) + ', ' + n + ' ödemeye bölünecek: ' + groupAmt(d) + '. Tablodaki elle düzenlemeler silinir. Onaylıyor musunuz?',
+    left: { label: 'Vazgeç' },
+    right: { label: 'Değiştir', danger: true, fn: () => odtApply(d.map((t, i) => ({ tarih: addMonthsIso(S.ilkVade, i), tutar: t, k: 1 })), 'Ödeme sayısı güncellendi.') } });
 }
 $('odtBox').addEventListener('click', e => {
   const b = e.target.closest('[data-odt]'); if (!b) return;
@@ -1050,14 +1128,21 @@ $('odtBox').addEventListener('click', e => {
     if (S.odt.manual) askModal({ title: 'Tablo kaldırılsın mı?', text: 'Elle yaptığınız değişiklikler silinir ve sözleşme ödeme tablosu olmadan hazırlanır.', left: { label: 'Vazgeç' }, right: { label: 'Tabloyu Kaldır', danger: true, fn: del } });
     else del();
   }
+  else if (act === 'dagit') odtDagit();
+  else if (act === 'cikar') odtCikar();
+  else if (act === 'sayi') odtSayi();
   else if (act === 'ekle') {
-    const L = S.odt.lines; const last = L[L.length - 1];
-    L.push({ tarih: last && isoOk(last.tarih) ? addMonthsIso(last.tarih, 1) : S.ilkVade, tutar: 0, k: 1 });
+    const L = S.odt.lines; const used = new Set(L.map(l => String(l.tarih).slice(0, 7)));
+    let tarih = null;
+    for (let m = 0; m < agreementMonths(); m++) { const dd = addMonthsIso(S.ilkVade, m); if (!used.has(dd.slice(0, 7))) { tarih = dd; break; } }
+    if (!tarih) { toast(`Anlaşma süresindeki bütün aylarda ödeme var. Süreyi uzatmak için Anlaşmayı Özelleştir'den ay sayısını değiştirin.`); return; }
+    L.push({ tarih, tutar: 0, k: 1 }); L.sort((x, y) => (x.tarih < y.tarih ? -1 : x.tarih > y.tarih ? 1 : 0));
+    S.odtSel = []; S.odtLocked = [];
     S.odt.manual = true; syncEvrak(); renderOdt(); refreshSummary();
   }
   else if (act === 'sil') {
     if (S.odt.lines.length <= 1) { toast('En az bir ödeme satırı olmalı.'); return; }
-    S.odt.lines.splice(+b.dataset.i, 1); S.odtSel = [];
+    S.odt.lines.splice(+b.dataset.i, 1); S.odtSel = []; S.odtLocked = [];
     S.odt.manual = true; syncEvrak(); renderOdt(); refreshSummary();
   }
   else if (act === 'birlestir') {
@@ -1067,13 +1152,19 @@ $('odtBox').addEventListener('click', e => {
     const merged = { tarih: L[idx[idx.length - 1]].tarih, tutar: Math.round(idx.reduce((a, i) => a + (+L[i].tutar || 0), 0) * 100) / 100, k: idx.reduce((a, i) => a + (L[i].k || 1), 0) };
     const out = [];
     L.forEach((l, i) => { if (i === idx[0]) out.push(merged); else if (idx.indexOf(i) === -1) out.push(l); });
-    S.odt.lines = out; S.odtSel = []; S.odt.manual = true;
+    S.odt.lines = out; S.odtSel = []; S.odtLocked = []; S.odt.manual = true;
     syncEvrak(); renderOdt(); refreshSummary();
     toast('Ödemeler birleştirildi. Tarihi satırdan değiştirebilirsiniz.');
   }
 });
 $('odtBox').addEventListener('input', e => {
   const t = e.target; if (t.dataset.oi == null || t.dataset.of !== 'tarih' || !S.odt) return;
+  const mx = odtMaxDate();
+  if (t.value > mx) {
+    t.value = S.odt.lines[+t.dataset.oi].tarih;
+    toast(`Ödeme tarihi anlaşmanın son vadesinden (${fmtDate(mx)}) ileri olamaz. Süreyi uzatmak için Anlaşmayı Özelleştir'den ay sayısını değiştirin.`);
+    return;
+  }
   S.odt.lines[+t.dataset.oi].tarih = t.value;
   S.odt.manual = true; updateOdtWarn();
 });
@@ -1135,6 +1226,7 @@ function validate() {
     if (S.odt) {
       if (S.odt.lines.some(l => !isoOk(l.tarih))) return 'Ödeme tablosundaki tarihleri kontrol edin.';
       if (S.odt.lines.some(l => !(l.tutar > 0))) return 'Ödeme tablosundaki tutarlar sıfırdan büyük olmalı.';
+      if (S.odt.lines.some(l => l.tarih > odtMaxDate())) return `Ödeme tablosunda anlaşma süresini aşan bir tarih var. Süreyi uzatmak için Anlaşmayı Özelleştir'den ay sayısını değiştirin.`;
     }
   }
   return '';
@@ -1147,12 +1239,15 @@ function buildModel() {
     id: S.savedId || uid(), ts: Date.now(), tarih: S.tarih,
     unvan: String(S.unvan).trim(), kod: String(S.kod).trim(), adres: String(S.adres).trim(),
     campId: c.id, campName: c.code + ' – ' + c.name + (S.ek ? ' – ' + S.ek : ''),
-    rows, plan: clone(S.plan), annex: S.annex, sartlar: c.sartlar.slice(), custom: !!S.custom || df.farklar.length > 0,
+    rows, plan: (S.odt && S.odt.manual) ? null : clone(S.plan), annex: S.annex, sartlar: c.sartlar.slice(), custom: !!S.custom || df.farklar.length > 0,
     odeme: c.odemeFixed || S.odeme, ozet: oz ? oz[1] : '',
     baslangic: c.tablo !== false ? S.baslangic : '',
     odt: (c.tablo !== false && S.odt) ? { lines: clone(S.odt.lines), tip: S.odeme === 'Kredi Kartı' ? 'kk' : 'evrak' } : null,
     tutar: oz ? parseMoney(oz[1]) : null,
     tutarTuru: S.plan ? 'Ödeme planı toplamı' : (S.num ? 'Aylık anlaşma (aylık × ay)' : 'Peşin ödeme (KDV dahil)'),
+    ay: S.plan ? planTotals(S.plan).ay : (S.num ? S.num.ay : null),
+    odtFark: (c.tablo !== false && S.odt && S.odt.lines.length !== agreementMonths()) ? 'Ödeme sayısı: ' + agreementMonths() + ' → ' + S.odt.lines.length : '',
+    odtDuzenlendi: !!(c.tablo !== false && S.odt && S.odt.manual),
     ekIskonto: df.ekIsk, farklar: df.farklar, aciklama: S.custom ? String(S.ekAciklama || '').trim() : '',
     snap: clone(SNAP)
   };
@@ -1350,7 +1445,7 @@ function kayitInfo(x) {
   const toplam = rowVal(x, 'Toplam Tutar') || rowVal(x, 'Ödeme Tutarı (KDV Dahil)') || x.ozet || '';
   const tutar = typeof x.tutar === 'number' ? x.tutar : parseMoney(x.ozet);
   const tur = x.tutarTuru || (x.plan ? 'Ödeme planı toplamı' : (rowVal(x, 'Aylık Ödeme') ? 'Aylık anlaşma (aylık × ay)' : 'Peşin ödeme (KDV dahil)'));
-  const ayM = /\((\d+) ay\)/.exec(toplam);
+  const ayM = /\((\d+) (?:ay|ödeme)\)/.exec(toplam);
   const isk = /%\s*(\d+(?:[.,]\d+)?)/.exec(rowVal(x, 'Liste İskontosu') || '');
   const hed = (x.rows || []).filter(r => /^(\d+\. )?Hediye Ürün Adı$/.test(r[0])).map(r => r[1]);
   let fayda = '';
@@ -1360,7 +1455,7 @@ function kayitInfo(x) {
   else if (rowVal(x, 'Cihaz')) fayda = rowVal(x, 'Cihaz') + ' – ' + (rowVal(x, 'Anlaşma Şekli') || '');
   else if (x.campId === 1) fayda = 'Hediye yok';
   return {
-    tutar, tutarTuru: tur, aylik: parseMoney(rowVal(x, 'Aylık Ödeme')), ay: ayM ? +ayM[1] : null,
+    tutar, tutarTuru: tur, aylik: parseMoney(rowVal(x, 'Aylık Ödeme')), ay: typeof x.ay === 'number' ? x.ay : (ayM ? +ayM[1] : null),
     iskonto: isk ? parseFloat(isk[1].replace(',', '.')) : null, ekIskonto: typeof x.ekIskonto === 'number' ? x.ekIskonto : null,
     fayda, hediyeTutar: parseMoney(rowVal(x, 'Hediye Çeki Tutarı') || rowVal(x, 'Hediye Ürün Tutarı')),
     fark: parseMoney(rowVal(x, 'Fiyat Farkı (Toplam)')),
@@ -1387,7 +1482,8 @@ function renderKayit() {
     const k = kayitInfo(x);
     let bd = '';
     if (k.ekIskonto != null && k.ekIskonto !== 0) bd += '<span class="badge">ek iskonto ' + (k.ekIskonto > 0 ? '+' : '−') + numTr(Math.abs(k.ekIskonto)) + '</span>';
-    if (k.farklar.length) bd += '<span class="badge">tablo dışı</span>'; else if (x.custom) bd += '<span class="badge">özel değer</span>';
+    if (k.farklar.length) bd += '<span class="badge">tablo dışı</span>'; else if (x.custom) bd += '<span class="badge">özelleştirilmiş</span>';
+    if (x.odtDuzenlendi) bd += '<span class="badge">ödeme planı düzenlendi</span>';
     return `<div class="list-row"><div class="info"><b>${esc(x.unvan)}</b><small>${fmtDateDot(x.tarih)} · ${esc(x.campName)}${x.ozet ? ' · ' + esc(x.ozet) : ''}${bd}</small>` +
       (k.aciklama ? `<small style="display:block">Not: ${esc(k.aciklama)}</small>` : '') + `</div>` +
       `<div class="acts"><button class="btn secondary" data-open="${x.id}">Aç</button><button class="btn danger" data-del="${x.id}">Sil</button></div></div>`;
@@ -1406,18 +1502,18 @@ $('btnExcel').addEventListener('click', () => {
   const all = lsGet(LS_KAYIT, []).sort((a, b) => a.ts - b.ts);
   if (!all.length) { toast('Aktarılacak kayıt yok.'); return; }
   const H = ['Tarih', 'Başlangıç Tarihi', 'Cari Kodu', 'Ünvan', 'Kampanya', 'Ödeme Çeşidi', 'Anlaşma Tutarı (₺)', 'Tutar Türü', 'Aylık Ödeme (₺)', 'Ay Sayısı',
-    'İskonto (%)', 'Ek İskonto (puan)', 'Hediye / Cihaz / Çek', 'Hediye / Çek Tutarı (₺)', 'Fiyat Farkı (₺)', 'Ödeme Tablosu', 'Özel Değer',
+    'İskonto (%)', 'Ek İskonto (puan)', 'Hediye / Cihaz / Çek', 'Hediye / Çek Tutarı (₺)', 'Fiyat Farkı (₺)', 'Ödeme Tablosu', 'Ödeme Planı Düzenlendi', 'Özelleştirildi',
     'Tablodan Farklı Alanlar', 'Ek Fayda Açıklaması', 'Kayıt Zamanı'];
   const nn = v => (v == null || v === '' || isNaN(v)) ? '' : v;
   const aoa = [H].concat(all.map(x => {
     const k = kayitInfo(x);
     return [fmtDateDot(x.tarih), x.baslangic ? fmtDateDot(x.baslangic) : '', x.kod, x.unvan, x.campName, x.odeme, nn(k.tutar), k.tutarTuru, nn(k.aylik), nn(k.ay),
-      nn(k.iskonto), nn(k.ekIskonto), k.fayda, nn(k.hediyeTutar), nn(k.fark), k.tablo, x.custom ? 'Evet' : 'Hayır',
-      k.farklar.join('; '), k.aciklama, new Date(x.ts).toLocaleString('tr-TR')];
+      nn(k.iskonto), nn(k.ekIskonto), k.fayda, nn(k.hediyeTutar), nn(k.fark), k.tablo, x.odtDuzenlendi ? 'Evet' : 'Hayır', x.custom ? 'Evet' : 'Hayır',
+      k.farklar.concat(x.odtFark ? [x.odtFark] : []).join('; '), k.aciklama, new Date(x.ts).toLocaleString('tr-TR')];
   }));
   if (window.XLSX) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [12, 16, 14, 40, 52, 24, 18, 26, 16, 10, 12, 16, 60, 20, 16, 18, 11, 70, 40, 20].map(w => ({ wch: w }));
+    ws['!cols'] = [12, 16, 14, 40, 52, 24, 18, 26, 16, 10, 12, 16, 60, 20, 16, 18, 14, 11, 70, 40, 20].map(w => ({ wch: w }));
     [6, 8, 13, 14].forEach(c => { for (let r = 1; r < aoa.length; r++) { const cell = ws[XLSX.utils.encode_cell({ r, c })]; if (cell && typeof cell.v === 'number') cell.z = '#,##0'; } });
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sözleşmeler');
     XLSX.writeFile(wb, 'gozbir_sozlesme_kayitlari.xlsx');
