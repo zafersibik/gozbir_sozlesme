@@ -213,6 +213,12 @@
   .ksum { background: var(--accent-light); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 0.82rem; }
   .ksum .rowk { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
   .ksum .tot { font-size: 0.95rem; border-bottom: 1px dashed var(--border); padding-bottom: 5px; margin-bottom: 4px; }
+  .slotrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .slotrow .fx { font-size: 0.85rem; font-weight: 600; }
+  .slotrow input[data-nf] { width: 120px; flex: none; }
+  .slotrow input[data-nf="int"], .slotrow input[data-nf="pct"] { width: 84px; }
+  .odt-erow input[data-nf] { padding: 8px 6px; font-size: 0.85rem; width: 100%; }
+  .nfprev { margin-top: 4px; }
   #printArea { display: none; }
   #toast {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -382,8 +388,7 @@ const TRMAP = { 'ı': 'i', 'İ': 'i', 'I': 'i', 'ş': 's', 'Ş': 's', 'ğ': 'g',
 const norm = s => String(s == null ? '' : s).replace(/[ıİIşŞğĞüÜöÖçÇ]/g, ch => TRMAP[ch]).toLowerCase().replace(/\s+/g, ' ').trim();
 function fmtTutar(t) {
   t = String(t || '').trim();
-  if (/^\d+$/.test(t)) return TL(+t);
-  if (/^[\d.]+$/.test(t)) return t + ' ₺';
+  if (/^\d+(\.\d+)?$/.test(t)) return money(parseFloat(t));
   return t;
 }
 function lsGet(k, f) { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : f; } catch (e) { return f; } }
@@ -543,7 +548,7 @@ function resetState() {
   Object.assign(S, { campId: null, sel: {}, rows: [], num: null, plan: null, annex: null, ek: '', custom: false,
     hediyeTutar: '', odeme: 'Sıralı Evrak', evrak: '', tarih: todayISO(), unvan: '', kod: '', adres: '', savedId: null, savedSig: null,
     baslangic: todayISO(), ilkVade: addDaysIso(todayISO(), 30), baslangicEdited: false, ilkEdited: false,
-    odt: null, odtSkip: false, odtEdit: false, odtSel: [], ekAciklama: '', orig: null });
+    odt: null, odtSkip: false, odtEdit: false, odtSel: [], ekAciklama: '', orig: null, hediyeManual: false });
 }
 resetState();
 let curModel = null, curLayout = null, prevPanel = 'yeni', fromSaved = false, curSig = null;
@@ -596,6 +601,129 @@ const odtStale = () => !!S.odt && S.odt.sig !== odtParamsSig();
 const agreementTotal = () => (S.plan ? planTotals(S.plan).toplam : (S.num ? S.num.aylik * S.num.ay : 0));
 
 const APP_TITLE = document.title;
+/* ============ Sayı alanları: binlik ayıraç, yalnızca rakam, 50 -> 50.000 kısayolu ============ */
+const grpInt = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+function nfDisplay(raw, kind) {
+  const dec = kind === 'pct' || kind === 'money' || kind === 'small';
+  const t = String(raw == null ? '' : raw).replace(/[^\d,]/g, '');
+  let ip = t, fp = null; const ci = t.indexOf(',');
+  if (ci > -1) {
+    if (dec) { ip = t.slice(0, ci); fp = t.slice(ci + 1).replace(/,/g, '').slice(0, 2); } else ip = t.replace(/,/g, '');
+  }
+  ip = ip.replace(/^0+(?=\d)/, '');
+  if (kind !== 'pct') ip = grpInt(ip);
+  return fp != null ? (ip || '0') + ',' + fp : ip;
+}
+const nfValue = d => { const v = parseFloat(String(d).replace(/\./g, '').replace(',', '.')); return isNaN(v) ? NaN : v; };
+function numDisp(n) {
+  const p = (Math.round((+n || 0) * 100) / 100).toFixed(2).split('.');
+  return grpInt(p[0]) + (p[1] === '00' ? '' : ',' + p[1]);
+}
+const nfInput = (kind, bind, disp) => `<input type="text" inputmode="${kind === 'int' ? 'numeric' : 'decimal'}" autocomplete="off" data-nf="${kind}" data-bind="${bind}" data-last="${esc(disp)}" value="${esc(disp)}">`;
+function nfMask(el) {
+  const pos = el.selectionStart == null ? el.value.length : el.selectionStart;
+  const n = el.value.slice(0, pos).replace(/[^\d,]/g, '').length;
+  const f = nfDisplay(el.value, el.dataset.nf);
+  if (f === el.value) return;
+  el.value = f;
+  let c = 0, np = 0;
+  if (n > 0) { np = f.length; for (let i = 0; i < f.length; i++) { if (/[\d,]/.test(f[i])) c++; if (c >= n) { np = i + 1; break; } } }
+  try { el.setSelectionRange(np, np); } catch (e) { /* bazı tarayıcılarda gerekmez */ }
+}
+function nfCommit(el) {
+  const kind = el.dataset.nf; let d = nfDisplay(el.value, kind);
+  if (d === '' && el.dataset.last != null && el.dataset.bind !== 'hediye') d = el.dataset.last;
+  if (kind === 'money' && d && d.indexOf(',') === -1) {
+    const n = parseInt(d.replace(/\./g, ''), 10);
+    if (n > 0 && n < 1000) d = grpInt(String(n * 1000));
+  }
+  d = d.replace(/,$/, '');
+  if (kind !== 'pct' && /,\d$/.test(d)) d += '0';
+  d = kind === 'pct' ? d.replace(/,(\d*[1-9])0+$/, ',$1').replace(/,0+$/, '') : d.replace(/,0{1,2}$/, '');
+  el.value = d; el.dataset.dirty = '';
+  return d;
+}
+let slotMap = {};
+function composeRow(ri) {
+  const def = slotMap[ri]; if (!def) return false;
+  const ins = Array.from(document.querySelectorAll('#customBox [data-bind^="row.' + ri + '."]'));
+  let out = '', ni = 0;
+  for (const p of def) {
+    if (p.t != null) out += p.t;
+    else { const el = ins[ni++]; const d = el ? el.value.replace(/,$/, '') : ''; if (!d) return false; out += d; }
+  }
+  S.rows[ri].v = out; return true;
+}
+function nfApply(el) {
+  const b = el.dataset.bind || '', d = el.value, v = nfValue(d);
+  let valid = true;
+  if (b === 'num.aylik') { if (d && v > 0) S.num.aylik = v; else valid = false; }
+  else if (b === 'num.ay') { if (d && v >= 1) S.num.ay = Math.round(v); else valid = false; }
+  else if (b.indexOf('plan.') === 0) { if (d && v > 0) S.plan.lines[+b.slice(5)].aylik = v; else valid = false; }
+  else if (b === 'hediye') { S.hediyeTutar = d ? String(v) : ''; S.hediyeManual = true; const hn = $('hediyeNot'); if (hn) hn.innerHTML = hediyeNot(); }
+  else if (b.indexOf('odt.') === 0) {
+    if (S.odt && d && v >= 0) { S.odt.lines[+b.slice(4)].tutar = v; S.odt.manual = true; updateOdtWarn(); } else valid = false;
+  }
+  else if (b.indexOf('row.') === 0) {
+    const ri = +b.split('.')[1];
+    if (composeRow(ri)) { if (/^(\d+\. )?Hediye Ürün Adı$/.test(S.rows[ri].l)) refreshHediye(); } else valid = false;
+  }
+  if (valid) { el.dataset.last = d; refreshSummary(); }
+}
+function nfPreview(el) {
+  const g = el.closest('.nfgrp'); const pv = g && g.querySelector('.nfprev'); if (!pv) return;
+  let t = '';
+  if (el.dataset.nf === 'money') {
+    const d = nfDisplay(el.value, 'money');
+    if (d && d.indexOf(',') === -1) { const n = parseInt(d.replace(/\./g, ''), 10); if (n > 0 && n < 1000) t = 'Alandan çıkınca ' + n + ' → ' + grpInt(String(n * 1000)) + ' ₺ olarak kaydedilir.'; }
+  }
+  pv.style.display = t ? '' : 'none'; pv.textContent = t;
+}
+function commitAllNf() {
+  document.querySelectorAll('[data-nf][data-dirty="1"]').forEach(el => { nfCommit(el); nfApply(el); });
+}
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.nf) return;
+  nfMask(t); t.dataset.dirty = '1'; nfApply(t); nfPreview(t);
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.nf) return;
+  nfCommit(t); nfApply(t); nfPreview(t);
+});
+
+/* Hediye ürün liste fiyatları (%65 iskontolu, KDV dahil): hediye ürün tutarı = adet x fiyat */
+const FIYAT = { 'Premium 1.50 Beyaz': 1166, 'Premium 1.50 Hybrid': 1382 };
+function hediyeHesap() {
+  const parts = [];
+  for (const r of S.rows) {
+    if (r.k || !/^(\d+\. )?Hediye Ürün Adı$/.test(r.l)) continue;
+    const m = /^(.*)\s*[–-]\s*(\d+)\s*Adet\s*$/i.exec(String(r.v).trim());
+    if (!m) return { durum: 'fiyatYok', adlar: [String(r.v).trim()] };
+    parts.push({ ad: m[1].trim(), adet: +m[2] });
+  }
+  if (!parts.length) return { durum: 'yok' };
+  const eksik = parts.filter(p => FIYAT[p.ad] == null).map(p => p.ad);
+  if (eksik.length) return { durum: 'fiyatYok', adlar: eksik };
+  parts.forEach(p => { p.fiyat = FIYAT[p.ad]; });
+  return { durum: 'ok', parts, tutar: parts.reduce((a, p) => a + p.adet * p.fiyat, 0) };
+}
+function hediyeNot() {
+  const h = hediyeHesap();
+  if (S.hediyeManual) {
+    return (String(S.hediyeTutar).trim() ? 'Elle girildi.' : 'Alan boş: sözleşmede Hediye Ürün Tutarı satırı basılmaz.') +
+      ' <button type="button" class="btn secondary" style="padding:4px 8px;font-size:0.75rem" data-hediye-auto="1">Otomatik hesapla</button>';
+  }
+  if (h.durum === 'ok') return 'Otomatik hesaplandı: ' + esc(h.parts.map(p => p.ad + ' ' + p.adet + ' × ' + TL(p.fiyat)).join(' + '));
+  if (h.durum === 'fiyatYok') return 'Fiyat bulunamadı (' + esc(h.adlar.join(', ')) + '), tutarı elle yazabilirsiniz.';
+  return '';
+}
+function refreshHediye(noDom) {
+  if (!S.hediyeManual) { const h = hediyeHesap(); S.hediyeTutar = h.durum === 'ok' ? String(h.tutar) : ''; }
+  if (noDom) return;
+  const inp = document.querySelector('#card-detay [data-bind="hediye"]');
+  if (inp && !S.hediyeManual) { inp.value = S.hediyeTutar === '' ? '' : numDisp(S.hediyeTutar); inp.dataset.last = inp.value; }
+  const n = $('hediyeNot'); if (n) n.innerHTML = hediyeNot();
+}
 const KISA = { 1: 'KMP1 Progressive', 2: 'KMP2 Elektronik Cihaz', 3: 'KMP3 Stok Cam', 41: 'KMP4-A Huvitz HPE 410', 42: 'KMP4-B Huvitz HPE 910 XD' };
 function pdfName(m) {
   const clean = v => String(v == null ? '' : v).replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -645,7 +773,7 @@ $('campGrid').addEventListener('click', e => {
   selectCamp(+b.dataset.id);
 });
 function selectCamp(id) {
-  S.campId = id; S.sel = {}; S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.orig = null; S.ekAciklama = '';
+  S.campId = id; S.sel = {}; S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.hediyeManual = false; S.orig = null; S.ekAciklama = '';
   S.savedId = null; S.savedSig = null; S.odt = null; S.odtSkip = false; S.odtEdit = false; S.odtSel = [];
   renderCamps(); renderDetay(); renderOdeme();
   ['card-musteri', 'card-odeme', 'card-aksiyon'].forEach(i => { $(i).style.display = 'block'; });
@@ -668,7 +796,7 @@ function renderDetay() {
   if (S.rows.length) {
     h += `<div class="sum"><div class="sum-t">Sözleşmeye yazılacak değerler</div><div id="sumBody"></div></div>`;
     if (S.rows.some(r => r.k === 'hediyeTutar')) {
-      h += `<div class="field" style="margin-top:10px"><label>Hediye Ürün Tutarı (isteğe bağlı, doldurursanız sözleşmeye yazılır)</label><input type="text" inputmode="numeric" data-hediye="1" value="${esc(S.hediyeTutar)}" placeholder="örn. 58000"></div>`;
+      h += `<div class="field nfgrp" style="margin-top:10px"><label>Hediye Ürün Tutarı (₺)</label>${nfInput('money', 'hediye', S.hediyeTutar === '' ? '' : numDisp(S.hediyeTutar))}<div class="muted nfprev" style="display:none"></div><div class="muted" id="hediyeNot" style="margin-top:4px">${hediyeNot()}</div></div>`;
     }
     h += `<label class="chk"><input type="checkbox" id="chkCustom"${S.custom ? ' checked' : ''}> Tablo dışı özel değer gireceğim</label><div id="customBox"></div>`;
   }
@@ -680,50 +808,72 @@ $('card-detay').addEventListener('change', e => {
   if (t.dataset.step) onStep(t.dataset.step, t.value);
   else if (t.id === 'chkCustom') { S.custom = t.checked; renderCustom(); }
 });
+$('card-detay').addEventListener('click', e => {
+  if (e.target.closest('[data-hediye-auto]')) { S.hediyeManual = false; refreshHediye(); refreshSummary(); }
+});
 $('card-detay').addEventListener('input', e => {
-  const t = e.target, d = t.dataset;
-  if (d.hediye) S.hediyeTutar = t.value;
-  else if (d.cu === 'aylik') S.num.aylik = +t.value || 0;
-  else if (d.cu === 'ay') S.num.ay = +t.value || 0;
-  else if (d.plan != null) S.plan.lines[+d.plan].aylik = +t.value || 0;
-  else if (d.row != null) S.rows[+d.row].v = t.value;
-  else if (d.aciklama) S.ekAciklama = t.value;
-  else return;
-  refreshSummary();
+  if (e.target.dataset.aciklama) { S.ekAciklama = e.target.value; refreshSummary(); }
 });
 function onStep(key, val) {
   const c = curCamp(); const idx = c.steps.findIndex(s => s.key === key);
   S.sel[key] = val;
   c.steps.slice(idx + 1).forEach(s => { delete S.sel[s.key]; });
-  S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.orig = null; S.ekAciklama = '';
+  S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.hediyeManual = false; S.orig = null; S.ekAciklama = '';
   if (c.steps.every(s => S.sel[s.key])) {
     const b = c.build(S.sel);
     S.rows = clone(b.rows); S.num = clone(b.num || null); S.plan = clone(b.plan || null);
     S.orig = { rows: clone(b.rows), num: clone(b.num || null), plan: clone(b.plan || null) };
+    refreshHediye(true);
     S.annex = b.annex || null; S.ek = b.ek || '';
     if (b.evrak != null) { S.evrak = String(b.evrak); const ei = $('o_evrak'); if (ei) ei.value = S.evrak; }
   }
   if (S.odt) syncEvrak();
   renderDetay();
 }
+const SLOT_DEFS = [
+  { label: /^Liste İskontosu$/, re: /^(%)(\d+(?:,\d+)?)$/, layout: 'TN', kinds: ['pct'] },
+  { label: /^(\d+\. )?Hediye Ürün Adı$/, re: /^(.*[–-]\s*)(\d+)(\s*Adet)$/, layout: 'TNT', kinds: ['int'] },
+  { label: /^Elektronik Kampanya Tutarı$/, re: /^([\d.,]+)( ₺ – kampanya imzalanırken çekilir)$/, layout: 'NT', kinds: ['money'] },
+  { label: /^Fiyat Farkı \(Toplam\)$/, re: /^([\d.,]+)( ₺)$/, layout: 'NT', kinds: ['money'] },
+  { label: /^(Ürün Liste Fiyatı|Kampanya Birim Fiyatı)$/, re: /^([\d.,]+)( ₺)$/, layout: 'NT', kinds: ['small'] },
+  { label: /^Toplam Cam Adedi$/, re: /^([\d.]+)( Adet)$/, layout: 'NT', kinds: ['int'] },
+  { label: /^Hediye Çeki Tutarı$/, re: /^([\d.,]+)( ₺ \(MediaMarkt\))$/, layout: 'NT', kinds: ['money'] },
+  { label: /^Ödeme Tutarı \(KDV Dahil\)$/, re: /^([\d.,]+)( ₺)$/, layout: 'NT', kinds: ['money'] },
+  { label: /^Anlaşma Şekli$/, re: /^(Yarısı Ödemeli \()([\d.,]+)( ₺, )(\d+)( ay vade\))$/, layout: 'TNTNT', kinds: ['money', 'int'] }
+];
+function slotsOf(r) {
+  for (const def of SLOT_DEFS) {
+    if (!def.label.test(r.l)) continue;
+    const m = def.re.exec(r.v); if (!m) return null;
+    const parts = []; let ni = 0;
+    def.layout.split('').forEach((k, gi) => { if (k === 'T') parts.push({ t: m[gi + 1] }); else parts.push({ kind: def.kinds[ni++], v: m[gi + 1] }); });
+    return parts;
+  }
+  return null;
+}
 function renderCustom() {
   const box = $('customBox'); if (!box) return;
   if (!S.custom) { box.innerHTML = ''; return; }
-  let h = '<div class="muted" style="margin-bottom:8px">Aşağıdaki değerleri sözleşmeye yazılacak şekilde elle değiştirebilirsiniz. Bu sözleşme kayıtlarda "özel değer" olarak işaretlenir.</div>';
+  slotMap = {};
+  let h = '<div class="muted" style="margin-bottom:8px">Yalnızca rakamlar değiştirilebilir. Tutarlarda 1.000\'den küçük bir sayıyı virgülsüz yazarsanız bin olarak kabul edilir (50 → 50.000 ₺). 1.000 ₺\'den küçük gerçek bir tutar için virgül kullanın (500,00). Bu sözleşme kayıtlarda "özel değer" olarak işaretlenir.</div>';
   h += `<div class="field"><label>Ek Fayda Açıklaması (isteğe bağlı)</label><textarea data-aciklama="1" placeholder="örn. 10 adet fazla Hybrid, fuar anlaşması">${esc(S.ekAciklama)}</textarea></div>`;
+  const grp = (label, inner) => `<div class="field nfgrp"><label>${label}</label><div class="slotrow">${inner}</div><div class="muted nfprev" style="display:none"></div></div>`;
   if (S.num) {
-    h += `<div class="row2"><div class="field"><label>Aylık Ödeme (₺)</label><input type="number" inputmode="numeric" data-cu="aylik" value="${S.num.aylik}"></div>` +
-      `<div class="field"><label>Ay</label><input type="number" inputmode="numeric" data-cu="ay" value="${S.num.ay}"></div></div>`;
+    h += grp('Aylık Ödeme', nfInput('money', 'num.aylik', numDisp(S.num.aylik)) + '<span class="fx">₺</span>');
+    h += grp('Ay Sayısı', nfInput('int', 'num.ay', String(S.num.ay)) + '<span class="fx">ay</span>');
   }
   if (S.plan) {
-    S.plan.lines.forEach((l, i) => { h += `<div class="field"><label>${i + 1}. yıl aylık ödeme (₺) — ${l.ay} ay</label><input type="number" inputmode="numeric" data-plan="${i}" value="${l.aylik}"></div>`; });
+    S.plan.lines.forEach((l, i) => { h += grp(`${i + 1}. yıl aylık ödeme — ${l.ay} ay`, nfInput('money', 'plan.' + i, numDisp(l.aylik)) + '<span class="fx">₺</span>'); });
   }
   S.rows.forEach((r, i) => {
     if (r.k) return;
-    h += `<div class="field"><label>${esc(r.l)}</label><input type="text" data-row="${i}" value="${esc(r.v)}"></div>`;
+    const parts = slotsOf(r); if (!parts) return;
+    slotMap[i] = parts; let ni = 0;
+    h += grp(esc(r.l), parts.map(p => p.t != null ? `<span class="fx">${esc(p.t)}</span>` : nfInput(p.kind, 'row.' + i + '.' + (ni++), p.v)).join(''));
   });
   box.innerHTML = h;
 }
+
 function resolveRows() {
   const c = curCamp(); const out = [];
   if (!c) return out;
@@ -820,6 +970,7 @@ function syncEvrak() {
   const ei = $('o_evrak'); if (ei) ei.value = S.evrak;
 }
 function createTable(silent) {
+  commitAllNf();
   if (!S.rows.length) { toast('Önce kampanya seçimlerini tamamlayın.'); return false; }
   if (!isoOk(S.baslangic) || !isoOk(S.ilkVade)) { toast('Başlangıç ve ilk vade tarihlerini seçin.'); return false; }
   if (S.num && !(S.num.aylik > 0 && S.num.ay >= 1 && S.num.ay <= 120)) { toast('Aylık ödeme ve ay değerlerini kontrol edin.'); return false; }
@@ -856,10 +1007,10 @@ function renderOdt() {
       S.odt.lines.map((l, i) => `<tr><td>${esc(lab[i])}</td><td>${fmtDate(l.tarih)}</td><td>${money(l.tutar)}</td></tr>`).join('') +
       `</tbody><tfoot><tr><th colspan="2">Toplam (${S.odt.lines.length} ödeme)</th><th>${money(odtTotal(S.odt.lines))}</th></tr></tfoot></table>`;
   } else {
-    h += '<div class="muted" style="margin-bottom:6px">Tarih ve tutarları değiştirebilir, satır ekleyip silebilir, birleştirmek istediğiniz ödemeleri işaretleyip "Seçili Ödemeleri Birleştir"e basabilirsiniz.</div>';
+    h += '<div class="muted" style="margin-bottom:6px">Tarih ve tutarları değiştirebilir, satır ekleyip silebilir, birleştirmek istediğiniz ödemeleri işaretleyip "Seçili Ödemeleri Birleştir"e basabilirsiniz. Tutarlarda 1.000\'den küçük bir sayıyı virgülsüz yazarsanız bin olarak kabul edilir (50 → 50.000 ₺).</div>';
     h += '<div class="odt-bar"><button type="button" class="btn secondary" data-odt="ekle">Satır Ekle</button><button type="button" class="btn secondary" data-odt="birlestir">Seçili Ödemeleri Birleştir</button></div>';
     h += '<div class="odt-ehead"><span>Seç</span><span>No</span><span>Tarih</span><span>Tutar (₺)</span><span></span></div>';
-    h += S.odt.lines.map((l, i) => `<div class="odt-erow"><input type="checkbox" data-osel="${i}"${S.odtSel.indexOf(i) > -1 ? ' checked' : ''} aria-label="Seç"><span class="odt-no">${esc(lab[i])}</span><input type="date" data-oi="${i}" data-of="tarih" value="${esc(l.tarih)}"><input type="number" step="0.01" inputmode="decimal" data-oi="${i}" data-of="tutar" value="${l.tutar}"><button type="button" class="btn danger" data-odt="sil" data-i="${i}" aria-label="Satırı sil">×</button></div>`).join('');
+    h += S.odt.lines.map((l, i) => `<div class="odt-erow"><input type="checkbox" data-osel="${i}"${S.odtSel.indexOf(i) > -1 ? ' checked' : ''} aria-label="Seç"><span class="odt-no">${esc(lab[i])}</span><input type="date" data-oi="${i}" data-of="tarih" value="${esc(l.tarih)}">${nfInput('money', 'odt.' + i, numDisp(l.tutar))}<button type="button" class="btn danger" data-odt="sil" data-i="${i}" aria-label="Satırı sil">×</button></div>`).join('');
   }
   box.innerHTML = h;
   updateOdtWarn();
@@ -903,9 +1054,8 @@ $('odtBox').addEventListener('click', e => {
   }
 });
 $('odtBox').addEventListener('input', e => {
-  const t = e.target; if (t.dataset.oi == null || !S.odt) return;
-  const l = S.odt.lines[+t.dataset.oi];
-  if (t.dataset.of === 'tarih') l.tarih = t.value; else l.tutar = parseFloat(t.value) || 0;
+  const t = e.target; if (t.dataset.oi == null || t.dataset.of !== 'tarih' || !S.odt) return;
+  S.odt.lines[+t.dataset.oi].tarih = t.value;
   S.odt.manual = true; updateOdtWarn();
 });
 $('odtBox').addEventListener('change', e => {
@@ -989,6 +1139,7 @@ function buildModel() {
   };
 }
 $('btnOnizle').addEventListener('click', () => {
+  commitAllNf();
   const err = validate(); const eb = $('err');
   if (err) { eb.textContent = err; eb.style.display = 'block'; return; }
   eb.style.display = 'none';
