@@ -91,6 +91,18 @@
   }
   textarea { resize: vertical; min-height: 64px; }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); }
+  input[type="date"] {
+    -webkit-appearance: none; appearance: none; position: relative; display: block;
+    text-align: left; min-height: 2.75rem; line-height: 1.3; padding-right: 42px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231B5E4B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; background-size: 20px 20px;
+  }
+  input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+  input[type="date"]::-webkit-datetime-edit { padding: 0; text-align: left; }
+  input[type="date"]::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) input[type="date"] { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235fbf9f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>"); }
+  }
+  :root[data-theme="dark"] input[type="date"] { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235fbf9f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>"); }
   select:disabled { opacity: 0.5; }
   input[type="checkbox"] { width: 22px; height: 22px; padding: 0; margin: 0; border: 0; background: transparent; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
   .chk { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text); cursor: pointer; margin: 10px 0; }
@@ -197,6 +209,7 @@
   .odt-tbl td:first-child { text-align: center; }
   .odt-erow { display: grid; grid-template-columns: 26px 46px 1fr 1fr 34px; gap: 6px; align-items: center; margin-bottom: 6px; }
   .odt-erow input[type="date"], .odt-erow input[type="number"] { padding: 8px 6px; font-size: 0.85rem; }
+  .odt-erow input[type="date"] { min-height: 2.3rem; padding-right: 26px; background-position: right 6px center; background-size: 15px 15px; }
   .odt-ehead { display: grid; grid-template-columns: 26px 46px 1fr 1fr 34px; gap: 6px; font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
   .odt-no { font-size: 0.82rem; font-weight: 700; text-align: center; }
   .odt-bar { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
@@ -772,13 +785,19 @@ $('campGrid').addEventListener('click', e => {
   const b = e.target.closest('.camp'); if (!b) return;
   selectCamp(+b.dataset.id);
 });
+/* Yapışık başlık çubuğunun altına hizalar, böylece kartın başı ve seçim kutuları örtülmez */
+function scrollToCard(el) {
+  const hdr = document.querySelector('header');
+  const top = el.getBoundingClientRect().top + (window.pageYOffset || 0) - (hdr ? hdr.offsetHeight : 0) - 10;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
 function selectCamp(id) {
   S.campId = id; S.sel = {}; S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.hediyeManual = false; S.orig = null; S.ekAciklama = '';
   S.savedId = null; S.savedSig = null; S.odt = null; S.odtSkip = false; S.odtEdit = false; S.odtSel = [];
   renderCamps(); renderDetay(); renderOdeme();
   ['card-musteri', 'card-odeme', 'card-aksiyon'].forEach(i => { $(i).style.display = 'block'; });
   $('err').style.display = 'none';
-  $('card-detay').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToCard($('card-detay'));
 }
 
 /* ============ 2. Kampanya detayı ============ */
