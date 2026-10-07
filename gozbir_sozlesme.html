@@ -191,6 +191,24 @@
   .modal-box p { margin: 0 0 14px; font-size: 0.88rem; color: var(--text-muted); }
   .modal-box .pv-bar { margin-bottom: 0; }
   .btn.warnbtn { background: var(--danger); }
+  .odt-tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 6px; }
+  .odt-tbl th, .odt-tbl td { border: 1px solid var(--border); padding: 6px 8px; text-align: right; }
+  .odt-tbl th { background: var(--accent-light); text-align: center; }
+  .odt-tbl td:first-child { text-align: center; }
+  .odt-erow { display: grid; grid-template-columns: 26px 46px 1fr 1fr 34px; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .odt-erow input[type="date"], .odt-erow input[type="number"] { padding: 8px 6px; font-size: 0.85rem; }
+  .odt-ehead { display: grid; grid-template-columns: 26px 46px 1fr 1fr 34px; gap: 6px; font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
+  .odt-no { font-size: 0.82rem; font-weight: 700; text-align: center; }
+  .odt-bar { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+  .odt-bar .btn { flex: 1 1 0; font-size: 0.78rem; padding: 10px 6px; }
+  .odt-r { display: flex; border: 0.3mm solid #444; border-top: none; height: 6.6mm; line-height: 6.6mm; font-size: 9pt; box-sizing: border-box; }
+  .odt-r.odt-h { background: #e6e6e6; font-weight: 700; border-top: 0.3mm solid #444; }
+  .odt-r > div { padding: 0 2mm; border-right: 0.3mm solid #444; white-space: nowrap; overflow: hidden; }
+  .odt-r > div:last-child { border-right: none; }
+  .odt-r .c1 { width: 24mm; text-align: center; flex: none; }
+  .odt-r .c2 { width: 46mm; text-align: center; flex: none; }
+  .odt-r .c3 { flex: 1; text-align: right; }
+  .odt-r .c4 { width: 50mm; flex: none; }
   #printArea { display: none; }
   #toast {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -255,7 +273,18 @@
         <label>Sözleşme Tarihi</label>
         <input type="date" id="o_tarih">
       </div>
+      <div id="tarihExtra">
+        <div class="field">
+          <label>Anlaşma Başlangıç Tarihi</label>
+          <input type="date" id="o_basl">
+        </div>
+        <div class="field">
+          <label>İlk Vade Tarihi (başlangıçtan 30 gün sonra otomatik gelir, değiştirebilirsiniz)</label>
+          <input type="date" id="o_ilk">
+        </div>
+      </div>
       <div id="odemeBody"></div>
+      <div id="odtBox"></div>
     </div>
 
     <div class="card" id="card-aksiyon" style="display:none">
@@ -463,7 +492,7 @@ const CAMPS = [
     },
     sartlar: [`Elektronik kampanya tutarı kampanya imzalanırken çekilecektir.`, `Kampanya iptalinde fazladan alınan fiyat farkı fatura tutarları, cariye geri yansıtılır.`, YIL, VADE, `Kampanyalar sözleşme ile yapılacaktır.`] },
 
-  { id: 3, code: 'KMP3', name: 'Stok Cam Kampanyası', evrak: false,
+  { id: 3, code: 'KMP3', name: 'Stok Cam Kampanyası', evrak: false, tablo: false,
     odemeFixed: 'Fuar günlerinde tahsil edilir (KDV dahil)',
     steps: [
       { key: 'paket', label: 'Stok Paketi', opts: () => Object.keys(PK3).map(k => [k, PK3[k].ad + ' (' + TL(PK3[k].odeme) + ')']) },
@@ -507,23 +536,59 @@ function machineCamp(id) {
 const S = {};
 function resetState() {
   Object.assign(S, { campId: null, sel: {}, rows: [], num: null, plan: null, annex: null, ek: '', custom: false,
-    hediyeTutar: '', odeme: 'Sıralı Evrak', evrak: '', tarih: todayISO(), unvan: '', kod: '', adres: '', savedId: null, savedSig: null });
+    hediyeTutar: '', odeme: 'Sıralı Evrak', evrak: '', tarih: todayISO(), unvan: '', kod: '', adres: '', savedId: null, savedSig: null,
+    baslangic: todayISO(), ilkVade: addDaysIso(todayISO(), 30), baslangicEdited: false, ilkEdited: false,
+    odt: null, odtSkip: false, odtEdit: false, odtSel: [] });
 }
 resetState();
 let curModel = null, curLayout = null, prevPanel = 'yeni', fromSaved = false, curSig = null;
 /* Formun şu anki durumunun imzası: kayıttan sonra herhangi bir değişiklik olursa imza değişir */
-const sig = () => JSON.stringify([S.campId, S.sel, S.rows, S.num, S.plan, S.odeme, S.evrak, S.tarih, S.unvan, S.kod, S.adres, S.hediyeTutar, S.custom]);
+const sig = () => JSON.stringify([S.campId, S.sel, S.rows, S.num, S.plan, S.odeme, S.evrak, S.tarih, S.unvan, S.kod, S.adres, S.hediyeTutar, S.custom, S.baslangic, S.ilkVade, S.odt]);
 const hasContent = () => !!(S.campId || String(S.unvan).trim() || String(S.kod).trim() || String(S.adres).trim());
 const isSaved = () => !!S.savedId && S.savedSig === sig();
-let modalCb = null;
-function askDiscard(cb) { modalCb = cb; $('modal').style.display = 'flex'; $('mNo').focus(); }
-$('mNo').addEventListener('click', () => { $('modal').style.display = 'none'; modalCb = null; });
-$('mYes').addEventListener('click', () => { $('modal').style.display = 'none'; const cb = modalCb; modalCb = null; if (cb) cb(); });
+let modalL = null, modalR = null;
+function askModal(o) {
+  $('mTitle').textContent = o.title; $('mText').textContent = o.text;
+  $('mNo').textContent = o.left.label; $('mYes').textContent = o.right.label;
+  $('mYes').className = 'btn' + (o.right.danger ? ' warnbtn' : '');
+  modalL = o.left.fn || null; modalR = o.right.fn || null;
+  $('modal').style.display = 'flex'; $('mNo').focus();
+}
+function closeModal(side) {
+  $('modal').style.display = 'none';
+  const f = side === 'L' ? modalL : modalR; modalL = modalR = null;
+  if (f) f();
+}
+$('mNo').addEventListener('click', () => closeModal('L'));
+$('mYes').addEventListener('click', () => closeModal('R'));
+function askDiscard(cb) {
+  askModal({ title: 'Sözleşme kaydedilmedi', text: 'Bu sözleşme kaydedilmedi. Yine de silinsin mi?', left: { label: 'Vazgeç' }, right: { label: 'Kaydetmeden Sil', danger: true, fn: cb } });
+}
 window.addEventListener('beforeunload', e => {
   if (hasContent() && !isSaved()) { e.preventDefault(); e.returnValue = ''; return ''; }
 });
 const curCamp = () => CAMPS.find(c => c.id === S.campId) || null;
 const planTotals = p => ({ toplam: p.lines.reduce((a, l) => a + l.aylik * l.ay, 0), ay: p.lines.reduce((a, l) => a + l.ay, 0) });
+
+/* ============ Tarih ve ödeme tablosu yardımcıları ============ */
+const isoOk = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') && !isNaN(Date.parse(v));
+function addDaysIso(iso, d) {
+  const p = iso.split('-').map(Number);
+  return new Date(Date.UTC(p[0], p[1] - 1, p[2] + d)).toISOString().slice(0, 10);
+}
+function addMonthsIso(iso, k) {
+  const p = iso.split('-').map(Number);
+  const first = new Date(Date.UTC(p[0], p[1] - 1 + k, 1));
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  return first.getUTCFullYear() + '-' + String(first.getUTCMonth() + 1).padStart(2, '0') + '-' + String(Math.min(p[2], last)).padStart(2, '0');
+}
+const money = n => (Number.isInteger(n) ? TL(n) : TL2(n));
+const odtLabels = lines => { let n = 1; return lines.map(l => { const k = l.k || 1; const a = n; n += k; return k === 1 ? String(a) : a + '-' + (a + k - 1); }); };
+const odtTotal = lines => Math.round(lines.reduce((a, l) => a + (+l.tutar || 0), 0) * 100) / 100;
+const hasTablo = () => { const c = curCamp(); return !!c && c.tablo !== false; };
+const odtParamsSig = () => JSON.stringify([S.campId, S.sel, S.num, S.plan, S.odeme, S.baslangic, S.ilkVade]);
+const odtStale = () => !!S.odt && S.odt.sig !== odtParamsSig();
+const agreementTotal = () => (S.plan ? planTotals(S.plan).toplam : (S.num ? S.num.aylik * S.num.ay : 0));
 
 /* ============ Panel ve sekmeler ============ */
 function showPanel(name) {
@@ -549,7 +614,7 @@ $('campGrid').addEventListener('click', e => {
 });
 function selectCamp(id) {
   S.campId = id; S.sel = {}; S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = '';
-  S.savedId = null; S.savedSig = null;
+  S.savedId = null; S.savedSig = null; S.odt = null; S.odtSkip = false; S.odtEdit = false; S.odtSel = [];
   renderCamps(); renderDetay(); renderOdeme();
   ['card-musteri', 'card-odeme', 'card-aksiyon'].forEach(i => { $(i).style.display = 'block'; });
   $('err').style.display = 'none';
@@ -604,6 +669,7 @@ function onStep(key, val) {
     S.annex = b.annex || null; S.ek = b.ek || '';
     if (b.evrak != null) { S.evrak = String(b.evrak); const ei = $('o_evrak'); if (ei) ei.value = S.evrak; }
   }
+  if (S.odt) syncEvrak();
   renderDetay();
 }
 function renderCustom() {
@@ -643,6 +709,7 @@ function resolveRows() {
   return out;
 }
 function refreshSummary() {
+  updateOdtWarn();
   const b = $('sumBody'); if (!b) return;
   let h = resolveRows().map(r => `<div><span>${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('');
   if (S.plan) {
@@ -653,7 +720,7 @@ function refreshSummary() {
   b.innerHTML = h;
 }
 
-/* ============ 4. Ödeme ============ */
+/* ============ 4. Ödeme ve ödeme tablosu ============ */
 function renderOdeme() {
   const c = curCamp(); const el = $('odemeBody'); if (!c) { el.innerHTML = ''; return; }
   let h = '';
@@ -661,20 +728,155 @@ function renderOdeme() {
     h = `<div class="field"><label>Ödeme Çeşidi</label><div class="fixed">${esc(c.odemeFixed)}</div></div>`;
   } else {
     h = `<div class="field"><label>Ödeme Çeşidi</label><select id="o_odeme"><option${S.odeme === 'Sıralı Evrak' ? ' selected' : ''}>Sıralı Evrak</option><option${S.odeme === 'Kredi Kartı' ? ' selected' : ''}>Kredi Kartı</option></select></div>`;
-    if (c.evrak) h += `<div class="field" id="evrakField"${S.odeme === 'Sıralı Evrak' ? '' : ' style="display:none"'}><label>Evrak Adedi</label><input type="number" inputmode="numeric" id="o_evrak" value="${esc(S.evrak)}"></div>`;
+    if (c.evrak) h += `<div class="field" id="evrakField"${S.odeme === 'Sıralı Evrak' ? '' : ' style="display:none"'}><label>Evrak Adedi${S.odt ? ' (ödeme tablosundaki satır sayısı)' : ''}</label><input type="number" inputmode="numeric" id="o_evrak" value="${esc(S.evrak)}"${S.odt ? ' readonly' : ''}></div>`;
   }
   el.innerHTML = h;
   $('o_tarih').value = S.tarih;
+  $('tarihExtra').style.display = c.tablo === false ? 'none' : '';
+  $('o_basl').value = S.baslangic; $('o_ilk').value = S.ilkVade;
+  renderOdt();
 }
 $('odemeBody').addEventListener('change', e => {
   if (e.target.id === 'o_odeme') {
     S.odeme = e.target.value;
     const f = $('evrakField'); if (f) f.style.display = S.odeme === 'Sıralı Evrak' ? '' : 'none';
-    refreshSummary();
+    refreshSummary(); renderOdt();
   }
 });
 $('odemeBody').addEventListener('input', e => { if (e.target.id === 'o_evrak') { S.evrak = e.target.value; refreshSummary(); } });
-$('o_tarih').addEventListener('change', e => { S.tarih = e.target.value; });
+
+function onDatesChanged() {
+  if (!S.odt) return;
+  if (!S.odt.manual) { createTable(true); return; }
+  askModal({ title: 'Tarih değişti', text: 'Ödeme tablosu yeni tarihlere göre yeniden oluşturulsun mu? Elle yaptığınız değişiklikler silinir.',
+    left: { label: 'Tabloyu Koru', fn: () => { if (S.odt) { S.odt.sig = odtParamsSig(); renderOdt(); } } },
+    right: { label: 'Yeniden Oluştur', danger: true, fn: () => createTable() } });
+}
+$('o_tarih').addEventListener('change', e => {
+  S.tarih = e.target.value;
+  if (!S.baslangicEdited && isoOk(S.tarih)) {
+    S.baslangic = S.tarih;
+    if (!S.ilkEdited) S.ilkVade = addDaysIso(S.baslangic, 30);
+    $('o_basl').value = S.baslangic; $('o_ilk').value = S.ilkVade;
+    onDatesChanged();
+  }
+});
+$('o_basl').addEventListener('change', e => {
+  if (!isoOk(e.target.value)) return;
+  S.baslangic = e.target.value; S.baslangicEdited = true;
+  if (!S.ilkEdited) { S.ilkVade = addDaysIso(S.baslangic, 30); $('o_ilk').value = S.ilkVade; }
+  onDatesChanged();
+});
+$('o_ilk').addEventListener('change', e => {
+  if (!isoOk(e.target.value)) return;
+  S.ilkVade = e.target.value; S.ilkEdited = true;
+  onDatesChanged();
+});
+
+function genOdt() {
+  const amounts = [];
+  if (S.plan) S.plan.lines.forEach(l => { for (let i = 0; i < Math.round(l.ay); i++) amounts.push(l.aylik); });
+  else if (S.num) for (let i = 0; i < Math.round(S.num.ay); i++) amounts.push(S.num.aylik);
+  return amounts.map((t, i) => ({ tarih: addMonthsIso(S.ilkVade, i), tutar: t, k: 1 }));
+}
+function syncEvrak() {
+  if (!S.odt) return;
+  S.evrak = String(S.odt.lines.length);
+  const ei = $('o_evrak'); if (ei) ei.value = S.evrak;
+}
+function createTable(silent) {
+  if (!S.rows.length) { toast('Önce kampanya seçimlerini tamamlayın.'); return false; }
+  if (!isoOk(S.baslangic) || !isoOk(S.ilkVade)) { toast('Başlangıç ve ilk vade tarihlerini seçin.'); return false; }
+  if (S.num && !(S.num.aylik > 0 && S.num.ay >= 1 && S.num.ay <= 120)) { toast('Aylık ödeme ve ay değerlerini kontrol edin.'); return false; }
+  const lines = genOdt();
+  if (!lines.length || lines.length > 120) { toast('Ödeme sayısı geçersiz.'); return false; }
+  S.odt = { lines, sig: odtParamsSig(), manual: false }; S.odtSkip = false; S.odtEdit = false; S.odtSel = [];
+  syncEvrak(); renderOdt(); refreshSummary();
+  const ei = $('o_evrak'); if (ei) ei.readOnly = true;
+  if (!silent) toast('Ödeme tablosu oluşturuldu.');
+  return true;
+}
+function updateOdtWarn() {
+  const w = $('odtWarn'); if (!w) return;
+  if (!S.odt) { w.innerHTML = ''; return; }
+  let h = '';
+  if (odtStale()) h += '<div class="warn">Tablo güncel değil: kampanya, tutar, ay sayısı, ödeme çeşidi veya tarih değişti. "Yeniden Oluştur" ile güncelleyin.</div>';
+  const t = odtTotal(S.odt.lines), a = agreementTotal(), d = Math.round((t - a) * 100) / 100;
+  h += d === 0 ? `<div class="muted">Tablo toplamı: ${money(t)} (anlaşma toplamıyla uyumlu)</div>`
+    : `<div class="warn">Tablo toplamı ${money(t)}, anlaşma toplamı ${money(a)}. Fark: ${money(Math.abs(d))} ${d > 0 ? 'fazla' : 'eksik'}.</div>`;
+  w.innerHTML = h;
+}
+function renderOdt() {
+  const box = $('odtBox'); if (!box) return;
+  if (!hasTablo()) { box.innerHTML = ''; return; }
+  if (!S.odt) {
+    box.innerHTML = '<button type="button" class="btn full" data-odt="olustur">Ödeme Tablosu Oluştur</button><div class="muted" style="margin-top:6px">Seçtiğiniz aylık ödeme, ay sayısı ve vade tarihlerine göre tablo oluşur. Sözleşmenin hemen ardından ek sayfa olarak basılır.</div>';
+    return;
+  }
+  const kk = S.odeme === 'Kredi Kartı'; const lab = odtLabels(S.odt.lines);
+  let h = '<div id="odtWarn"></div>';
+  h += `<div class="odt-bar"><button type="button" class="btn secondary" data-odt="${S.odtEdit ? 'bitti' : 'duzenle'}">${S.odtEdit ? 'Bitti' : 'Düzenle'}</button><button type="button" class="btn secondary" data-odt="yeniden">Yeniden Oluştur</button><button type="button" class="btn secondary" data-odt="kaldir">Tabloyu Kaldır</button></div>`;
+  if (!S.odtEdit) {
+    h += `<table class="odt-tbl"><thead><tr><th>${kk ? 'Taksit' : 'No'}</th><th>${kk ? 'Ödeme Tarihi' : 'Vade Tarihi'}</th><th>Tutar</th></tr></thead><tbody>` +
+      S.odt.lines.map((l, i) => `<tr><td>${esc(lab[i])}</td><td>${fmtDate(l.tarih)}</td><td>${money(l.tutar)}</td></tr>`).join('') +
+      `</tbody><tfoot><tr><th colspan="2">Toplam (${S.odt.lines.length} ödeme)</th><th>${money(odtTotal(S.odt.lines))}</th></tr></tfoot></table>`;
+  } else {
+    h += '<div class="muted" style="margin-bottom:6px">Tarih ve tutarları değiştirebilir, satır ekleyip silebilir, birleştirmek istediğiniz ödemeleri işaretleyip "Seçili Ödemeleri Birleştir"e basabilirsiniz.</div>';
+    h += '<div class="odt-bar"><button type="button" class="btn secondary" data-odt="ekle">Satır Ekle</button><button type="button" class="btn secondary" data-odt="birlestir">Seçili Ödemeleri Birleştir</button></div>';
+    h += '<div class="odt-ehead"><span>Seç</span><span>No</span><span>Tarih</span><span>Tutar (₺)</span><span></span></div>';
+    h += S.odt.lines.map((l, i) => `<div class="odt-erow"><input type="checkbox" data-osel="${i}"${S.odtSel.indexOf(i) > -1 ? ' checked' : ''} aria-label="Seç"><span class="odt-no">${esc(lab[i])}</span><input type="date" data-oi="${i}" data-of="tarih" value="${esc(l.tarih)}"><input type="number" step="0.01" inputmode="decimal" data-oi="${i}" data-of="tutar" value="${l.tutar}"><button type="button" class="btn danger" data-odt="sil" data-i="${i}" aria-label="Satırı sil">×</button></div>`).join('');
+  }
+  box.innerHTML = h;
+  updateOdtWarn();
+}
+$('odtBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-odt]'); if (!b) return;
+  const act = b.dataset.odt;
+  const askReset = fn => {
+    if (S.odt && S.odt.manual) askModal({ title: 'Tablo yeniden oluşturulsun mu?', text: 'Elle yaptığınız değişiklikler silinir.', left: { label: 'Vazgeç' }, right: { label: 'Yeniden Oluştur', danger: true, fn } });
+    else fn();
+  };
+  if (act === 'olustur') createTable();
+  else if (act === 'yeniden') askReset(() => createTable());
+  else if (act === 'duzenle') { S.odtEdit = true; S.odtSel = []; renderOdt(); }
+  else if (act === 'bitti') { S.odtEdit = false; renderOdt(); }
+  else if (act === 'kaldir') {
+    const del = () => { S.odt = null; S.odtEdit = false; S.odtSel = []; S.odtSkip = true; const ei = $('o_evrak'); if (ei) ei.readOnly = false; renderOdt(); refreshSummary(); };
+    if (S.odt.manual) askModal({ title: 'Tablo kaldırılsın mı?', text: 'Elle yaptığınız değişiklikler silinir ve sözleşme ödeme tablosu olmadan hazırlanır.', left: { label: 'Vazgeç' }, right: { label: 'Tabloyu Kaldır', danger: true, fn: del } });
+    else del();
+  }
+  else if (act === 'ekle') {
+    const L = S.odt.lines; const last = L[L.length - 1];
+    L.push({ tarih: last && isoOk(last.tarih) ? addMonthsIso(last.tarih, 1) : S.ilkVade, tutar: 0, k: 1 });
+    S.odt.manual = true; syncEvrak(); renderOdt(); refreshSummary();
+  }
+  else if (act === 'sil') {
+    if (S.odt.lines.length <= 1) { toast('En az bir ödeme satırı olmalı.'); return; }
+    S.odt.lines.splice(+b.dataset.i, 1); S.odtSel = [];
+    S.odt.manual = true; syncEvrak(); renderOdt(); refreshSummary();
+  }
+  else if (act === 'birlestir') {
+    const idx = S.odtSel.slice().sort((x, y) => x - y);
+    if (idx.length < 2) { toast('Birleştirmek için en az iki ödemeyi işaretleyin.'); return; }
+    const L = S.odt.lines;
+    const merged = { tarih: L[idx[idx.length - 1]].tarih, tutar: Math.round(idx.reduce((a, i) => a + (+L[i].tutar || 0), 0) * 100) / 100, k: idx.reduce((a, i) => a + (L[i].k || 1), 0) };
+    const out = [];
+    L.forEach((l, i) => { if (i === idx[0]) out.push(merged); else if (idx.indexOf(i) === -1) out.push(l); });
+    S.odt.lines = out; S.odtSel = []; S.odt.manual = true;
+    syncEvrak(); renderOdt(); refreshSummary();
+    toast('Ödemeler birleştirildi. Tarihi satırdan değiştirebilirsiniz.');
+  }
+});
+$('odtBox').addEventListener('input', e => {
+  const t = e.target; if (t.dataset.oi == null || !S.odt) return;
+  const l = S.odt.lines[+t.dataset.oi];
+  if (t.dataset.of === 'tarih') l.tarih = t.value; else l.tutar = parseFloat(t.value) || 0;
+  S.odt.manual = true; updateOdtWarn();
+});
+$('odtBox').addEventListener('change', e => {
+  const t = e.target; if (t.dataset.osel == null) return;
+  const i = +t.dataset.osel; S.odtSel = S.odtSel.filter(x => x !== i); if (t.checked) S.odtSel.push(i);
+});
 
 /* ============ 3. Müşteri ============ */
 const MU = { list: [], idx: [], ts: 0 };
@@ -723,6 +925,14 @@ function validate() {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(S.tarih || '')) return 'Sözleşme tarihini seçin.';
   if (S.num && (!(S.num.aylik > 0) || !(S.num.ay > 0))) return 'Aylık ödeme ve ay değerleri sıfırdan büyük olmalı.';
   if (!c.odemeFixed && c.evrak && S.odeme === 'Sıralı Evrak' && !String(S.evrak).trim()) return 'Evrak adedini girin.';
+  if (c.tablo !== false) {
+    if (!isoOk(S.baslangic)) return 'Anlaşma başlangıç tarihini seçin.';
+    if (!isoOk(S.ilkVade)) return 'İlk vade tarihini seçin.';
+    if (S.odt) {
+      if (S.odt.lines.some(l => !isoOk(l.tarih))) return 'Ödeme tablosundaki tarihleri kontrol edin.';
+      if (S.odt.lines.some(l => !(l.tutar > 0))) return 'Ödeme tablosundaki tutarlar sıfırdan büyük olmalı.';
+    }
+  }
   return '';
 }
 function buildModel() {
@@ -734,6 +944,8 @@ function buildModel() {
     campId: c.id, campName: c.code + ' – ' + c.name + (S.ek ? ' – ' + S.ek : ''),
     rows, plan: clone(S.plan), annex: S.annex, sartlar: c.sartlar.slice(), custom: !!S.custom,
     odeme: c.odemeFixed || S.odeme, ozet: oz ? oz[1] : '',
+    baslangic: c.tablo !== false ? S.baslangic : '',
+    odt: (c.tablo !== false && S.odt) ? { lines: clone(S.odt.lines), tip: S.odeme === 'Kredi Kartı' ? 'kk' : 'evrak' } : null,
     snap: clone(SNAP)
   };
 }
@@ -741,8 +953,33 @@ $('btnOnizle').addEventListener('click', () => {
   const err = validate(); const eb = $('err');
   if (err) { eb.textContent = err; eb.style.display = 'block'; return; }
   eb.style.display = 'none';
-  showPreview(buildModel(), 'yeni', false);
+  guardTable(() => showPreview(buildModel(), 'yeni', false));
 });
+function guardTable(cb) {
+  if (!hasTablo()) { cb(); return; }
+  if (S.odtEdit) { S.odtEdit = false; renderOdt(); }
+  const goTable = () => { const bx = $('odtBox'); if (bx && bx.scrollIntoView) bx.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+  if (!S.odt && !S.odtSkip) {
+    askModal({ title: 'Ödeme tablosu oluşturulmadı', text: 'Bu sözleşme için ödeme tablosu oluşturulmadı. Tablo olmadan devam edilsin mi?',
+      left: { label: 'Tablosuz Devam', fn: () => { S.odtSkip = true; cb(); } },
+      right: { label: 'Tablo Oluştur', fn: () => { if (createTable()) goTable(); } } });
+    return;
+  }
+  if (odtStale()) {
+    askModal({ title: 'Ödeme tablosu güncel değil', text: 'Kampanya, tutar, ay sayısı, ödeme çeşidi veya tarih tablo oluşturulduktan sonra değişti. Tablonun yeniden oluşturulması gerekir, elle yaptığınız düzenlemeler silinir.',
+      left: { label: 'Vazgeç' }, right: { label: 'Yeniden Oluştur', danger: true, fn: () => { if (createTable()) goTable(); } } });
+    return;
+  }
+  if (S.odt) {
+    const t = odtTotal(S.odt.lines), a = agreementTotal();
+    if (Math.round((t - a) * 100) !== 0) {
+      askModal({ title: 'Tablo toplamı farklı', text: `Tablo toplamı ${money(t)}, anlaşma toplamı ${money(a)}. Farkla devam edilsin mi?`,
+        left: { label: 'Düzelt', fn: goTable }, right: { label: 'Devam Et', fn: cb } });
+      return;
+    }
+  }
+  cb();
+}
 function resetForm() {
   resetState();
   ['c_unvan', 'c_kod', 'c_adres'].forEach(i => { $(i).value = ''; });
@@ -778,7 +1015,9 @@ function buildBlocks(m, N) {
   row('Cari Kodu', m.kod);
   row('Adresi', m.adres);
   row('Kampanya Şekli', m.campName);
+  if (m.baslangic) row('Başlangıç Tarihi', fmtDate(m.baslangic));
   m.rows.forEach(r => row(r[0], r[1]));
+  if (m.odt) row('Ödeme Planı', 'Ekteki ödeme tablosunda gösterilmiştir.');
   if (m.plan) {
     const t = planTotals(m.plan);
     add(`<div class="blk-plan"><div class="t">ÖDEME PLANI</div><table><thead><tr><th>Dönem</th><th>Aylık Ödeme</th><th>Ay</th><th>Yıllık Ödeme</th></tr></thead><tbody>` +
@@ -801,19 +1040,41 @@ function buildBlocks(m, N) {
     add(`<div class="blk-note">UV420 + Kırılma direnci + Süper Hidrofobik</div>`, { keep: true });
     add(`<div class="mx-wrap">${a.html}${b.html}</div>`);
   }
+  if (m.odt && m.odt.lines.length) {
+    const kk = m.odt.tip === 'kk', lab = odtLabels(m.odt.lines), tot = odtTotal(m.odt.lines);
+    const cells = (c1, c2, c3) => `<div class="c1">${esc(c1)}</div><div class="c2">${esc(c2)}</div><div class="c3">${esc(c3)}</div>${kk ? '' : '<div class="c4"></div>'}`;
+    const hdr = `<div class="odt-r odt-h"><div class="c1">${kk ? 'Taksit No' : 'No'}</div><div class="c2">${kk ? 'Ödeme Tarihi' : 'Vade Tarihi'}</div><div class="c3">Tutar</div>${kk ? '' : '<div class="c4">Evrak No</div>'}</div>`;
+    add(`<div class="blk-h" style="font-size:10.5pt">EK-1: ÖDEME TABLOSU${kk ? ' (KREDİ KARTI)' : ''}</div>`, { brk: true, keep: true });
+    row('Alıcı Ünvanı', m.unvan); row('Cari Kodu', m.kod); row('Kampanya Şekli', m.campName);
+    row('Sözleşme Tarihi', fmtDate(m.tarih)); row('Başlangıç Tarihi', fmtDate(m.baslangic)); row('Ödeme Çeşidi', m.odeme);
+    row('Toplam Tutar', money(tot) + ' (' + m.odt.lines.length + ' ödeme)');
+    add('<div style="height:3mm"></div>');
+    add(hdr, { keep: true, grp: 'odt', hdr, isHeader: true });
+    m.odt.lines.forEach((l, i) => add(`<div class="odt-r">${cells(lab[i], fmtDate(l.tarih), money(l.tutar))}</div>`, { grp: 'odt', hdr }));
+    add(`<div class="odt-r odt-h">${cells('', 'TOPLAM', money(tot))}</div>`, { grp: 'odt', hdr, keep: true });
+    add(`<div class="blk-sign"><div><b>SATICI</b>Merve Gözlük Camı San. ve Tic. A.Ş.</div><div><b>ALICI</b>${esc(m.unvan)}</div></div>`);
+  }
   return B;
 }
 function flow(blocks) {
-  const ms = $('measure'); ms.innerHTML = blocks.map(b => b.html).join('');
+  const ms = $('measure');
+  const probes = [], pidx = {};
+  blocks.forEach(b => { if (b.hdr && pidx[b.grp] == null) { pidx[b.grp] = probes.length; probes.push(b.hdr); } });
+  ms.innerHTML = blocks.map(b => b.html).join('') + probes.join('');
   const hs = Array.prototype.map.call(ms.children, e => e.offsetHeight);
+  const hh = probes.map((p, i) => hs[blocks.length + i]);
   ms.innerHTML = '';
-  const pages = [[]]; let cur = 0;
+  const pages = [[]]; let cur = 0, lastGrp = null;
   blocks.forEach((b, i) => {
     let need = hs[i];
     if (b.keep && blocks[i + 1]) need += hs[i + 1];
     const pg = pages[pages.length - 1];
-    if ((b.brk && pg.length) || (pg.length && cur + need > PAGE_H)) { pages.push([]); cur = 0; }
+    if ((b.brk && pg.length) || (pg.length && cur + need > PAGE_H)) {
+      pages.push([]); cur = 0;
+      if (b.grp && b.grp === lastGrp && b.hdr && !b.isHeader) { pages[pages.length - 1].push(b.hdr); cur += hh[pidx[b.grp]]; }
+    }
     pages[pages.length - 1].push(b.html); cur += hs[i];
+    lastGrp = b.grp || null;
   });
   return pages;
 }
@@ -895,11 +1156,11 @@ $('kayitList').addEventListener('click', e => {
 $('btnExcel').addEventListener('click', () => {
   const all = lsGet(LS_KAYIT, []).sort((a, b) => a.ts - b.ts);
   if (!all.length) { toast('Aktarılacak kayıt yok.'); return; }
-  const aoa = [['Tarih', 'Cari Kodu', 'Ünvan', 'Kampanya', 'Ödeme Çeşidi', 'Tutar', 'Özel Değer', 'Kayıt Zamanı']].concat(all.map(x =>
-    [fmtDateDot(x.tarih), x.kod, x.unvan, x.campName, x.odeme, x.ozet, x.custom ? 'Evet' : 'Hayır', new Date(x.ts).toLocaleString('tr-TR')]));
+  const aoa = [['Tarih', 'Başlangıç Tarihi', 'Cari Kodu', 'Ünvan', 'Kampanya', 'Ödeme Çeşidi', 'Tutar', 'Özel Değer', 'Kayıt Zamanı']].concat(all.map(x =>
+    [fmtDateDot(x.tarih), x.baslangic ? fmtDateDot(x.baslangic) : '', x.kod, x.unvan, x.campName, x.odeme, x.ozet, x.custom ? 'Evet' : 'Hayır', new Date(x.ts).toLocaleString('tr-TR')]));
   if (window.XLSX) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 12 }, { wch: 14 }, { wch: 40 }, { wch: 52 }, { wch: 24 }, { wch: 24 }, { wch: 11 }, { wch: 20 }];
+    ws['!cols'] = [{ wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 40 }, { wch: 52 }, { wch: 24 }, { wch: 24 }, { wch: 11 }, { wch: 20 }];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sözleşmeler');
     XLSX.writeFile(wb, 'gozbir_sozlesme_kayitlari.xlsx');
   } else {
