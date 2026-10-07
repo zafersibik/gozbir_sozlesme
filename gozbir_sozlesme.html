@@ -209,6 +209,10 @@
   .odt-r .c2 { width: 46mm; text-align: center; flex: none; }
   .odt-r .c3 { flex: 1; text-align: right; }
   .odt-r .c4 { width: 50mm; flex: none; }
+  .badge { display: inline-block; background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border); border-radius: 6px; padding: 0 6px; font-size: 0.72rem; font-weight: 700; margin-left: 4px; }
+  .ksum { background: var(--accent-light); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 0.82rem; }
+  .ksum .rowk { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .ksum .tot { font-size: 0.95rem; border-bottom: 1px dashed var(--border); padding-bottom: 5px; margin-bottom: 4px; }
   #printArea { display: none; }
   #toast {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -320,6 +324,7 @@
       <div class="field">
         <input type="text" id="k_q" placeholder="Ünvan, cari kodu veya kampanya ara">
       </div>
+      <div id="kSummary"></div>
       <div id="kayitList"></div>
       <button class="btn secondary full" id="btnExcel" style="margin-top:10px">Excel'e Aktar</button>
       <p class="muted">Kayıtlar yalnızca bu cihazın tarayıcı hafızasında tutulur.</p>
@@ -538,12 +543,12 @@ function resetState() {
   Object.assign(S, { campId: null, sel: {}, rows: [], num: null, plan: null, annex: null, ek: '', custom: false,
     hediyeTutar: '', odeme: 'Sıralı Evrak', evrak: '', tarih: todayISO(), unvan: '', kod: '', adres: '', savedId: null, savedSig: null,
     baslangic: todayISO(), ilkVade: addDaysIso(todayISO(), 30), baslangicEdited: false, ilkEdited: false,
-    odt: null, odtSkip: false, odtEdit: false, odtSel: [] });
+    odt: null, odtSkip: false, odtEdit: false, odtSel: [], ekAciklama: '', orig: null });
 }
 resetState();
 let curModel = null, curLayout = null, prevPanel = 'yeni', fromSaved = false, curSig = null;
 /* Formun şu anki durumunun imzası: kayıttan sonra herhangi bir değişiklik olursa imza değişir */
-const sig = () => JSON.stringify([S.campId, S.sel, S.rows, S.num, S.plan, S.odeme, S.evrak, S.tarih, S.unvan, S.kod, S.adres, S.hediyeTutar, S.custom, S.baslangic, S.ilkVade, S.odt]);
+const sig = () => JSON.stringify([S.campId, S.sel, S.rows, S.num, S.plan, S.odeme, S.evrak, S.tarih, S.unvan, S.kod, S.adres, S.hediyeTutar, S.custom, S.baslangic, S.ilkVade, S.odt, S.ekAciklama]);
 const hasContent = () => !!(S.campId || String(S.unvan).trim() || String(S.kod).trim() || String(S.adres).trim());
 const isSaved = () => !!S.savedId && S.savedSig === sig();
 let modalL = null, modalR = null;
@@ -590,10 +595,37 @@ const odtParamsSig = () => JSON.stringify([S.campId, S.sel, S.num, S.plan, S.ode
 const odtStale = () => !!S.odt && S.odt.sig !== odtParamsSig();
 const agreementTotal = () => (S.plan ? planTotals(S.plan).toplam : (S.num ? S.num.aylik * S.num.ay : 0));
 
+const APP_TITLE = document.title;
+const KISA = { 1: 'KMP1 Progressive', 2: 'KMP2 Elektronik Cihaz', 3: 'KMP3 Stok Cam', 41: 'KMP4-A Huvitz HPE 410', 42: 'KMP4-B Huvitz HPE 910 XD' };
+function pdfName(m) {
+  const clean = v => String(v == null ? '' : v).replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let u = clean(m.unvan); if (u.length > 60) u = u.slice(0, 60).trim();
+  return u + ' - Gözbir Sözleşmesi - ' + (KISA[m.campId] || clean(m.campName)) + ' - ' + fmtDateDot(m.tarih);
+}
+function parseMoney(v) {
+  const m = /([\d.]+(?:,\d+)?)\s*₺/.exec(String(v == null ? '' : v));
+  return m ? parseFloat(m[1].replace(/\./g, '').replace(',', '.')) : null;
+}
+/* Katalogdaki (orijinal) değerlerle sözleşmeye yazılan değerleri karşılaştırır */
+function diffInfo() {
+  const o = S.orig, out = [];
+  if (!o) return { farklar: out, ekIsk: null };
+  S.rows.forEach((r, i) => { const q = o.rows[i]; if (!r.k && q && !q.k && r.v !== q.v) out.push(r.l + ': ' + q.v + ' → ' + r.v); });
+  if (S.num && o.num) {
+    if (S.num.aylik !== o.num.aylik) out.push('Aylık Ödeme: ' + TL(o.num.aylik) + ' → ' + TL(S.num.aylik));
+    if (S.num.ay !== o.num.ay) out.push('Ay Sayısı: ' + o.num.ay + ' → ' + S.num.ay);
+  }
+  if (S.plan && o.plan) S.plan.lines.forEach((l, i) => { const q = o.plan.lines[i]; if (q && l.aylik !== q.aylik) out.push((i + 1) + '. Yıl Aylık Ödeme: ' + TL(q.aylik) + ' → ' + TL(l.aylik)); });
+  const pi = rows => { const r = rows.find(x => !x.k && x.l === 'Liste İskontosu'); const m = r && /%\s*(\d+(?:[.,]\d+)?)/.exec(r.v); return m ? parseFloat(m[1].replace(',', '.')) : null; };
+  const a = pi(S.rows), b = pi(o.rows);
+  return { farklar: out, ekIsk: (a != null && b != null) ? Math.round((a - b) * 100) / 100 : null };
+}
+
 /* ============ Panel ve sekmeler ============ */
 function showPanel(name) {
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.title = APP_TITLE;
   if (name === 'kayit') renderKayit();
   if (name === 'musteri') renderMusteriPanel();
   window.scrollTo(0, 0);
@@ -613,7 +645,7 @@ $('campGrid').addEventListener('click', e => {
   selectCamp(+b.dataset.id);
 });
 function selectCamp(id) {
-  S.campId = id; S.sel = {}; S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = '';
+  S.campId = id; S.sel = {}; S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.orig = null; S.ekAciklama = '';
   S.savedId = null; S.savedSig = null; S.odt = null; S.odtSkip = false; S.odtEdit = false; S.odtSel = [];
   renderCamps(); renderDetay(); renderOdeme();
   ['card-musteri', 'card-odeme', 'card-aksiyon'].forEach(i => { $(i).style.display = 'block'; });
@@ -655,6 +687,7 @@ $('card-detay').addEventListener('input', e => {
   else if (d.cu === 'ay') S.num.ay = +t.value || 0;
   else if (d.plan != null) S.plan.lines[+d.plan].aylik = +t.value || 0;
   else if (d.row != null) S.rows[+d.row].v = t.value;
+  else if (d.aciklama) S.ekAciklama = t.value;
   else return;
   refreshSummary();
 });
@@ -662,10 +695,11 @@ function onStep(key, val) {
   const c = curCamp(); const idx = c.steps.findIndex(s => s.key === key);
   S.sel[key] = val;
   c.steps.slice(idx + 1).forEach(s => { delete S.sel[s.key]; });
-  S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = '';
+  S.rows = []; S.num = null; S.plan = null; S.annex = null; S.ek = ''; S.custom = false; S.hediyeTutar = ''; S.orig = null; S.ekAciklama = '';
   if (c.steps.every(s => S.sel[s.key])) {
     const b = c.build(S.sel);
     S.rows = clone(b.rows); S.num = clone(b.num || null); S.plan = clone(b.plan || null);
+    S.orig = { rows: clone(b.rows), num: clone(b.num || null), plan: clone(b.plan || null) };
     S.annex = b.annex || null; S.ek = b.ek || '';
     if (b.evrak != null) { S.evrak = String(b.evrak); const ei = $('o_evrak'); if (ei) ei.value = S.evrak; }
   }
@@ -676,6 +710,7 @@ function renderCustom() {
   const box = $('customBox'); if (!box) return;
   if (!S.custom) { box.innerHTML = ''; return; }
   let h = '<div class="muted" style="margin-bottom:8px">Aşağıdaki değerleri sözleşmeye yazılacak şekilde elle değiştirebilirsiniz. Bu sözleşme kayıtlarda "özel değer" olarak işaretlenir.</div>';
+  h += `<div class="field"><label>Ek Fayda Açıklaması (isteğe bağlı)</label><textarea data-aciklama="1" placeholder="örn. 10 adet fazla Hybrid, fuar anlaşması">${esc(S.ekAciklama)}</textarea></div>`;
   if (S.num) {
     h += `<div class="row2"><div class="field"><label>Aylık Ödeme (₺)</label><input type="number" inputmode="numeric" data-cu="aylik" value="${S.num.aylik}"></div>` +
       `<div class="field"><label>Ay</label><input type="number" inputmode="numeric" data-cu="ay" value="${S.num.ay}"></div></div>`;
@@ -938,14 +973,18 @@ function validate() {
 function buildModel() {
   const c = curCamp(); const rows = resolveRows();
   const oz = rows.find(r => /^(Toplam Tutar|Ön Ödeme Tutarı|Ödeme Tutarı)/.test(r[0]));
+  const df = diffInfo();
   return {
     id: S.savedId || uid(), ts: Date.now(), tarih: S.tarih,
     unvan: String(S.unvan).trim(), kod: String(S.kod).trim(), adres: String(S.adres).trim(),
     campId: c.id, campName: c.code + ' – ' + c.name + (S.ek ? ' – ' + S.ek : ''),
-    rows, plan: clone(S.plan), annex: S.annex, sartlar: c.sartlar.slice(), custom: !!S.custom,
+    rows, plan: clone(S.plan), annex: S.annex, sartlar: c.sartlar.slice(), custom: !!S.custom || df.farklar.length > 0,
     odeme: c.odemeFixed || S.odeme, ozet: oz ? oz[1] : '',
     baslangic: c.tablo !== false ? S.baslangic : '',
     odt: (c.tablo !== false && S.odt) ? { lines: clone(S.odt.lines), tip: S.odeme === 'Kredi Kartı' ? 'kk' : 'evrak' } : null,
+    tutar: oz ? parseMoney(oz[1]) : null,
+    tutarTuru: S.plan ? 'Ödeme planı toplamı' : (S.num ? 'Aylık anlaşma (aylık × ay)' : 'Peşin ödeme (KDV dahil)'),
+    ekIskonto: df.ekIsk, farklar: df.farklar, aciklama: S.custom ? String(S.ekAciklama || '').trim() : '',
     snap: clone(SNAP)
   };
 }
@@ -1088,6 +1127,7 @@ const pageHtml = (blks, i, N, tag) => `<div class="page"><div class="pg-body">${
 /* ============ Önizleme, kaydet, yazdır ============ */
 function showPreview(m, from, saved) {
   curModel = m; prevPanel = from; fromSaved = saved;
+  document.title = pdfName(m);
   if (!saved) curSig = sig();
   curLayout = layoutModel(m);
   $('previewScale').innerHTML = curLayout.pages.map((p, i) => pageHtml(p, i, curLayout.N, '')).join('');
@@ -1135,14 +1175,53 @@ $('pvPrint1').addEventListener('click', () => yazdir(1));
 
 /* ============ Kayıtlar ============ */
 function updateKayitBadge() { const n = lsGet(LS_KAYIT, []).length; $('tabKayit').textContent = 'Kayıtlar' + (n ? ' (' + n + ')' : ''); }
+const rowVal = (x, l) => { const r = (x.rows || []).find(q => q[0] === l); return r ? r[1] : null; };
+function kayitInfo(x) {
+  const toplam = rowVal(x, 'Toplam Tutar') || rowVal(x, 'Ödeme Tutarı (KDV Dahil)') || x.ozet || '';
+  const tutar = typeof x.tutar === 'number' ? x.tutar : parseMoney(x.ozet);
+  const tur = x.tutarTuru || (x.plan ? 'Ödeme planı toplamı' : (rowVal(x, 'Aylık Ödeme') ? 'Aylık anlaşma (aylık × ay)' : 'Peşin ödeme (KDV dahil)'));
+  const ayM = /\((\d+) ay\)/.exec(toplam);
+  const isk = /%\s*(\d+(?:[.,]\d+)?)/.exec(rowVal(x, 'Liste İskontosu') || '');
+  const hed = (x.rows || []).filter(r => /^(\d+\. )?Hediye Ürün Adı$/.test(r[0])).map(r => r[1]);
+  let fayda = '';
+  if (hed.length) fayda = hed.join(' + ');
+  else if (rowVal(x, 'Elektronik Cihaz')) fayda = String(rowVal(x, 'Elektronik Cihaz')).split(' – ')[0];
+  else if (rowVal(x, 'Hediye Çeki Tutarı')) fayda = 'Hediye çeki ' + rowVal(x, 'Hediye Çeki Tutarı');
+  else if (rowVal(x, 'Cihaz')) fayda = rowVal(x, 'Cihaz') + ' – ' + (rowVal(x, 'Anlaşma Şekli') || '');
+  else if (x.campId === 1) fayda = 'Hediye yok';
+  return {
+    tutar, tutarTuru: tur, aylik: parseMoney(rowVal(x, 'Aylık Ödeme')), ay: ayM ? +ayM[1] : null,
+    iskonto: isk ? parseFloat(isk[1].replace(',', '.')) : null, ekIskonto: typeof x.ekIskonto === 'number' ? x.ekIskonto : null,
+    fayda, hediyeTutar: parseMoney(rowVal(x, 'Hediye Çeki Tutarı') || rowVal(x, 'Hediye Ürün Tutarı')),
+    fark: parseMoney(rowVal(x, 'Fiyat Farkı (Toplam)')),
+    tablo: x.odt ? 'Var (' + x.odt.lines.length + ' ödeme)' : (x.campId === 3 ? '—' : 'Yok'),
+    farklar: x.farklar || [], aciklama: x.aciklama || ''
+  };
+}
+const numTr = n => String(n).replace('.', ',');
 function renderKayit() {
   const q = norm($('k_q').value);
   const all = lsGet(LS_KAYIT, []).sort((a, b) => b.ts - a.ts)
     .filter(x => !q || norm(x.unvan + ' ' + x.kod + ' ' + x.campName).indexOf(q) > -1);
-  $('kayitList').innerHTML = all.length ? all.map(x =>
-    `<div class="list-row"><div class="info"><b>${esc(x.unvan)}</b><small>${fmtDateDot(x.tarih)} · ${esc(x.campName)}${x.ozet ? ' · ' + esc(x.ozet) : ''}${x.custom ? ' · özel değer' : ''}</small></div>` +
-    `<div class="acts"><button class="btn secondary" data-open="${x.id}">Aç</button><button class="btn danger" data-del="${x.id}">Sil</button></div></div>`).join('')
-    : '<div class="empty-msg">Kayıtlı sözleşme yok.</div>';
+  // Özet: kayıt sayısı ve anlaşma tutarları
+  let total = 0; const per = [];
+  CAMPS.forEach(c => {
+    const sub = all.filter(x => x.campId === c.id); if (!sub.length) return;
+    const t = sub.reduce((a, x) => a + (kayitInfo(x).tutar || 0), 0); total += t;
+    per.push('<div class="rowk"><span>' + esc(KISA[c.id] || c.code) + ' · ' + sub.length + ' adet</span><span>' + money(t) + '</span></div>');
+  });
+  $('kSummary').innerHTML = all.length
+    ? '<div class="ksum"><div class="rowk tot"><span><b>' + all.length + '</b> sözleşme</span><b>' + money(total) + '</b></div>' + per.join('') +
+      '<div class="muted" style="margin-top:6px">Tutarlar: aylık anlaşmalarda aylık × ay, makinelerde ödeme planı toplamı, stok camda KDV dahil ödeme. Farklı türler birlikte toplanmıştır.</div></div>' : '';
+  $('kayitList').innerHTML = all.length ? all.map(x => {
+    const k = kayitInfo(x);
+    let bd = '';
+    if (k.ekIskonto != null && k.ekIskonto !== 0) bd += '<span class="badge">ek iskonto ' + (k.ekIskonto > 0 ? '+' : '−') + numTr(Math.abs(k.ekIskonto)) + '</span>';
+    if (k.farklar.length) bd += '<span class="badge">tablo dışı</span>'; else if (x.custom) bd += '<span class="badge">özel değer</span>';
+    return `<div class="list-row"><div class="info"><b>${esc(x.unvan)}</b><small>${fmtDateDot(x.tarih)} · ${esc(x.campName)}${x.ozet ? ' · ' + esc(x.ozet) : ''}${bd}</small>` +
+      (k.aciklama ? `<small style="display:block">Not: ${esc(k.aciklama)}</small>` : '') + `</div>` +
+      `<div class="acts"><button class="btn secondary" data-open="${x.id}">Aç</button><button class="btn danger" data-del="${x.id}">Sil</button></div></div>`;
+  }).join('') : '<div class="empty-msg">Kayıtlı sözleşme yok.</div>';
 }
 $('k_q').addEventListener('input', renderKayit);
 $('kayitList').addEventListener('click', e => {
@@ -1156,11 +1235,20 @@ $('kayitList').addEventListener('click', e => {
 $('btnExcel').addEventListener('click', () => {
   const all = lsGet(LS_KAYIT, []).sort((a, b) => a.ts - b.ts);
   if (!all.length) { toast('Aktarılacak kayıt yok.'); return; }
-  const aoa = [['Tarih', 'Başlangıç Tarihi', 'Cari Kodu', 'Ünvan', 'Kampanya', 'Ödeme Çeşidi', 'Tutar', 'Özel Değer', 'Kayıt Zamanı']].concat(all.map(x =>
-    [fmtDateDot(x.tarih), x.baslangic ? fmtDateDot(x.baslangic) : '', x.kod, x.unvan, x.campName, x.odeme, x.ozet, x.custom ? 'Evet' : 'Hayır', new Date(x.ts).toLocaleString('tr-TR')]));
+  const H = ['Tarih', 'Başlangıç Tarihi', 'Cari Kodu', 'Ünvan', 'Kampanya', 'Ödeme Çeşidi', 'Anlaşma Tutarı (₺)', 'Tutar Türü', 'Aylık Ödeme (₺)', 'Ay Sayısı',
+    'İskonto (%)', 'Ek İskonto (puan)', 'Hediye / Cihaz / Çek', 'Hediye / Çek Tutarı (₺)', 'Fiyat Farkı (₺)', 'Ödeme Tablosu', 'Özel Değer',
+    'Tablodan Farklı Alanlar', 'Ek Fayda Açıklaması', 'Kayıt Zamanı'];
+  const nn = v => (v == null || v === '' || isNaN(v)) ? '' : v;
+  const aoa = [H].concat(all.map(x => {
+    const k = kayitInfo(x);
+    return [fmtDateDot(x.tarih), x.baslangic ? fmtDateDot(x.baslangic) : '', x.kod, x.unvan, x.campName, x.odeme, nn(k.tutar), k.tutarTuru, nn(k.aylik), nn(k.ay),
+      nn(k.iskonto), nn(k.ekIskonto), k.fayda, nn(k.hediyeTutar), nn(k.fark), k.tablo, x.custom ? 'Evet' : 'Hayır',
+      k.farklar.join('; '), k.aciklama, new Date(x.ts).toLocaleString('tr-TR')];
+  }));
   if (window.XLSX) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 40 }, { wch: 52 }, { wch: 24 }, { wch: 24 }, { wch: 11 }, { wch: 20 }];
+    ws['!cols'] = [12, 16, 14, 40, 52, 24, 18, 26, 16, 10, 12, 16, 60, 20, 16, 18, 11, 70, 40, 20].map(w => ({ wch: w }));
+    [6, 8, 13, 14].forEach(c => { for (let r = 1; r < aoa.length; r++) { const cell = ws[XLSX.utils.encode_cell({ r, c })]; if (cell && typeof cell.v === 'number') cell.z = '#,##0'; } });
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sözleşmeler');
     XLSX.writeFile(wb, 'gozbir_sozlesme_kayitlari.xlsx');
   } else {
