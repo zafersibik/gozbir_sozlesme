@@ -13,7 +13,7 @@
     --text: #1a1a1a;
     --text-muted: #6b7280;
     --border: #e2e5e9;
-    --accent: #1B5E4B;
+    --accent: #1B5E4B; --btn-bg: #1B5E4B;
     --accent-light: #e6f2ee;
     --result-bg: #d7f4de;
     --result-fg: #14532d;
@@ -28,14 +28,14 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #14181c; --card-bg: #1f242a; --header-bg: #123f31; --header-fg: #eaf1f7;
-      --text: #eef1f4; --text-muted: #9aa4af; --border: #2c333b; --accent: #5fbf9f;
+      --text: #eef1f4; --text-muted: #9aa4af; --border: #2c333b; --accent: #5fbf9f; --btn-bg: #2B8267;
       --accent-light: #1b3a31; --result-bg: #163a24; --result-fg: #8fe3a8;
       --input-bg: #2a2712; --input-border: #6b5d1c; --tab-inactive: #262c33;
     }
   }
   :root[data-theme="dark"] {
     --bg: #14181c; --card-bg: #1f242a; --header-bg: #123f31; --header-fg: #eaf1f7;
-    --text: #eef1f4; --text-muted: #9aa4af; --border: #2c333b; --accent: #5fbf9f;
+    --text: #eef1f4; --text-muted: #9aa4af; --border: #2c333b; --accent: #5fbf9f; --btn-bg: #2B8267;
     --accent-light: #1b3a31; --result-bg: #163a24; --result-fg: #8fe3a8;
     --input-bg: #2a2712; --input-border: #6b5d1c; --tab-inactive: #262c33;
   }
@@ -73,7 +73,7 @@
     background: var(--tab-inactive); color: var(--text);
     font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit;
   }
-  .tab-btn.active { background: var(--accent); color: #fff; }
+  .tab-btn.active { background: var(--btn-bg); color: #fff; }
   .tab-btn:focus-visible, .btn:focus-visible, .camp:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .panel { display: none; }
@@ -126,7 +126,8 @@
   .sum span { flex: none; max-width: 42%; }
   .sum b { text-align: right; }
 
-  .btn { padding: 11px 14px; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-weight: 700; font-size: 0.88rem; cursor: pointer; font-family: inherit; }
+  .btn { padding: 11px 14px; border-radius: 10px; border: none; background: var(--btn-bg); color: #fff; font-weight: 700; font-size: 0.88rem; cursor: pointer; font-family: inherit; }
+  .btn:active { filter: brightness(0.9); }
   .btn.secondary { background: var(--tab-inactive); color: var(--text); }
   .btn.danger { background: none; color: var(--danger); padding: 6px 8px; font-weight: 600; }
   .btn.full { width: 100%; }
@@ -232,11 +233,15 @@
   .slotrow input[data-nf="int"], .slotrow input[data-nf="pct"] { width: 84px; }
   .odt-erow input[data-nf] { padding: 8px 6px; font-size: 0.85rem; width: 100%; }
   .nfprev { margin-top: 4px; }
-  .custom-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; margin: 10px 0; border: 1.5px solid var(--accent); border-radius: 10px; background: var(--accent-light); cursor: pointer; }
-  .custom-opt.on { border-width: 2px; padding: 9.5px 11.5px; }
-  .custom-opt input[type="checkbox"] { margin-top: 2px; }
+  .custom-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; margin: 10px 0; border: 2px solid var(--btn-bg); border-radius: 10px; background: var(--card-bg); cursor: pointer; }
+  .custom-opt.on { background: var(--btn-bg); }
+  .custom-opt input[type="checkbox"] { -webkit-appearance: none; appearance: none; position: relative; width: 22px; height: 22px; margin-top: 2px; border: 2px solid var(--accent); border-radius: 5px; background: var(--card-bg); flex: none; box-sizing: border-box; }
+  .custom-opt.on input[type="checkbox"] { border-color: #fff; background: #fff; }
+  .custom-opt input[type="checkbox"]:checked::after { content: ''; position: absolute; left: 5.5px; top: 1px; width: 5px; height: 10px; border: solid var(--btn-bg); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
   .custom-opt b { display: block; color: var(--accent); font-size: 0.95rem; }
+  .custom-opt.on b { color: #fff; }
   .custom-opt small { display: block; color: var(--text-muted); font-size: 0.75rem; margin-top: 2px; }
+  .custom-opt.on small { color: #d7ebe2; }
   .odt-tot { background: var(--accent-light); border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: 0.85rem; }
   .odt-tot .rowk { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
   .odt-tot .ok { color: var(--accent); }
@@ -744,6 +749,15 @@ function hediyeNot() {
   if (h.durum === 'fiyatYok') return 'Fiyat bulunamadı (' + esc(h.adlar.join(', ')) + '), tutarı elle yazabilirsiniz.';
   return '';
 }
+/* Özelleştirme kapatılınca satırları, aylık ödemeyi ve planı katalog değerlerine döndürür */
+function revertCustom() {
+  const o = S.orig; if (!o) return;
+  S.rows.forEach((r, i) => { if (!r.k && o.rows[i]) r.v = o.rows[i].v; });
+  if (S.num && o.num) S.num = clone(o.num);
+  if (S.plan && o.plan) S.plan = clone(o.plan);
+  S.ekAciklama = '';
+  refreshHediye();
+}
 function refreshHediye(noDom) {
   if (!S.hediyeManual) { const h = hediyeHesap(); S.hediyeTutar = h.durum === 'ok' ? String(h.tutar) : ''; }
   if (noDom) return;
@@ -839,7 +853,15 @@ function renderDetay() {
 $('card-detay').addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.step) onStep(t.dataset.step, t.value);
-  else if (t.id === 'chkCustom') { S.custom = t.checked; const lb = t.closest('label'); if (lb) lb.classList.toggle('on', t.checked); renderCustom(); }
+  else if (t.id === 'chkCustom') {
+    const lb = t.closest('label');
+    const degisti = !t.checked && S.custom && (diffInfo().farklar.length > 0 || String(S.ekAciklama).trim());
+    if (degisti) {
+      t.checked = true;
+      askModal({ title: 'Özelleştirme kapatılsın mı?', text: 'Değiştirdiğiniz değerler katalog değerlerine dönecek.', left: { label: 'Vazgeç' },
+        right: { label: 'Kapat ve Sıfırla', danger: true, fn: () => { revertCustom(); S.custom = false; t.checked = false; if (lb) lb.classList.remove('on'); renderCustom(); refreshSummary(); } } });
+    } else { S.custom = t.checked; if (lb) lb.classList.toggle('on', t.checked); renderCustom(); }
+  }
 });
 $('card-detay').addEventListener('click', e => {
   if (e.target.closest('[data-hediye-auto]')) { S.hediyeManual = false; refreshHediye(); refreshSummary(); }
