@@ -253,6 +253,8 @@
   .cb-sec { margin: 16px 0 6px; padding-top: 12px; border-top: 1px dashed var(--border); }
   .cb-sec b { display: block; font-size: 0.95rem; }
   html.ios .page { height: 282mm; padding-bottom: 14mm; }
+  #pdfStage { position: fixed; left: -10000px; top: 0; width: 210mm; background: #fff; z-index: -1; }
+  #pdfStage .page { height: 297mm !important; padding-bottom: 18mm !important; margin: 0 !important; box-shadow: none !important; }
   #printArea { display: none; }
   #toast {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -353,7 +355,14 @@
         <button class="btn secondary" id="pvPrint2">Yazdır (Asıl + Suret)</button>
         <button class="btn secondary" id="pvPrint1">Tek Nüsha Yazdır</button>
       </div>
-      <div class="muted">PDF olarak almak için yazdırma ekranında "PDF olarak kaydet" seçeneğini kullanın.</div>
+      <div class="pv-bar">
+        <button class="btn" id="pvSavePdf">Kaydet ve PDF İndir (Asıl + Suret)</button>
+      </div>
+      <div class="pv-bar">
+        <button class="btn secondary" id="pvPdf2">PDF İndir (Asıl + Suret)</button>
+        <button class="btn secondary" id="pvPdf1">PDF İndir (Tek Nüsha)</button>
+      </div>
+      <div class="muted">"PDF İndir" düğmeleri telefonda ve bilgisayarda aynı A4 çıktıyı verir (internet gerekir, PDF'teki yazılar seçilemez). "Yazdır" düğmeleri tarayıcının yazdırma ekranını açar.</div>
     </div>
     <div class="pv-wrap" id="pvWrap"><div id="previewScale"></div></div>
   </div>
@@ -1622,19 +1631,25 @@ function buildBlocks(m, N) {
     const kk = m.cb.tip === 'kk', lab = odtLabels(m.cb.lines), tot = odtTotal(m.cb.lines);
     const cells = (c1, c2, c3) => `<div class="c1">${esc(c1)}</div><div class="c2">${esc(c2)}</div><div class="c3">${esc(c3)}</div>${kk ? '' : '<div class="c4"></div>'}`;
     const hdr = `<div class="odt-r odt-h"><div class="c1">${kk ? 'Taksit No' : 'No'}</div><div class="c2">${kk ? 'Ödeme Tarihi' : 'Vade Tarihi'}</div><div class="c3">Tutar</div>${kk ? '' : '<div class="c4">Evrak No</div>'}</div>`;
-    add(`<div class="blk-h" style="font-size:10.5pt">${m.odt && m.odt.lines.length ? 'EK-1B' : 'EK-1'}: CİHAZ BEDELİ ÖDEME TABLOSU${kk ? ' (KREDİ KARTI)' : ''}</div>`, { brk: true, keep: true });
-    row('Alıcı Ünvanı', m.unvan); row('Cari Kodu', m.kod); row('Kampanya Şekli', m.campName);
-    row('Sözleşme Tarihi', fmtDate(m.tarih)); row('İlk Vade Tarihi', fmtDate(m.cb.ilk)); row('Ödeme Çeşidi', m.odeme);
-    row('Cihaz Bedeli Toplamı', money(m.cb.toplam) + ' (' + m.cb.lines.length + ' ödeme)');
-    add('<div style="height:3mm"></div>');
-    add(hdr, { keep: true, grp: 'cb', hdr, isHeader: true });
-    m.cb.lines.forEach((l, i) => add(`<div class="odt-r">${cells(lab[i], fmtDate(l.tarih), money(l.tutar))}</div>`, { grp: 'cb', hdr }));
+    const shared = !!(m.odt && m.odt.lines.length);
+    const rowH = (l, v) => `<div class="blk-row"><div class="l">${esc(l)}</div><div class="c">:</div><div class="v">${esc(v)}</div></div>`;
+    const dataRow = i => `<div class="odt-r">${cells(lab[i], fmtDate(m.cb.lines[i].tarih), money(m.cb.lines[i].tutar))}</div>`;
+    const first = m.cb.lines.slice(0, 2).map((l, i) => dataRow(i)).join('');
+    const head = `<div class="blk-h" style="font-size:10.5pt">${shared ? 'EK-1B' : 'EK-1'}: CİHAZ BEDELİ ÖDEME TABLOSU${kk ? ' (KREDİ KARTI)' : ''}</div>` +
+      rowH('Alıcı Ünvanı', m.unvan) + rowH('Cari Kodu', m.kod) + rowH('Kampanya Şekli', m.campName) + rowH('Sözleşme Tarihi', fmtDate(m.tarih)) +
+      rowH('İlk Vade Tarihi', fmtDate(m.cb.ilk)) + rowH('Ödeme Çeşidi', m.odeme) +
+      rowH('Cihaz Bedeli Toplamı', money(m.cb.toplam) + ' (' + m.cb.lines.length + ' ödeme)') +
+      '<div style="height:3mm"></div>' + hdr + first;
+    /* önceki ek (EK-1) sayfada yer bırakmışsa aynı sayfada, arada boşlukla devam eder; sığmazsa yeni sayfada başlar */
+    add(head, { brk: !shared, gap: shared ? 30 : 0, grp: 'cb', hdr, isHeader: true });
+    m.cb.lines.slice(2).forEach((l, i) => add(dataRow(i + 2), { grp: 'cb', hdr }));
     add(`<div class="odt-r odt-h">${cells('', 'TOPLAM', money(tot))}</div>`, { grp: 'cb', hdr, keep: true });
     add(`<div class="blk-sign"><div><b>SATICI</b>Merve Gözlük Camı San. ve Tic. A.Ş.</div><div><b>ALICI</b>${esc(m.unvan)}</div></div>`);
   }
   return B;
 }
-function flow(blocks) {
+function flow(blocks, PH) {
+  PH = PH || PAGE_H;
   const ms = $('measure');
   const probes = [], pidx = {};
   blocks.forEach(b => { if (b.hdr && pidx[b.grp] == null) { pidx[b.grp] = probes.length; probes.push(b.hdr); } });
@@ -1647,18 +1662,21 @@ function flow(blocks) {
     let need = hs[i];
     if (b.keep && blocks[i + 1]) need += hs[i + 1];
     const pg = pages[pages.length - 1];
-    if ((b.brk && pg.length) || (pg.length && cur + need > PAGE_H)) {
+    const gap = b.gap || 0;
+    if ((b.brk && pg.length) || (pg.length && cur + gap + need > PH)) {
       pages.push([]); cur = 0;
       if (b.grp && b.grp === lastGrp && b.hdr && !b.isHeader) { pages[pages.length - 1].push(b.hdr); cur += hh[pidx[b.grp]]; }
+    } else if (gap && pg.length) {
+      pg.push(`<div style="height:${gap}px"></div>`); cur += gap;
     }
     pages[pages.length - 1].push(b.html); cur += hs[i];
     lastGrp = b.grp || null;
   });
   return pages;
 }
-function layoutModel(m) {
-  let N = 1, pages = flow(buildBlocks(m, N));
-  for (let t = 0; t < 4 && pages.length !== N; t++) { N = pages.length; pages = flow(buildBlocks(m, N)); }
+function layoutModel(m, ph) {
+  let N = 1, pages = flow(buildBlocks(m, N), ph);
+  for (let t = 0; t < 4 && pages.length !== N; t++) { N = pages.length; pages = flow(buildBlocks(m, N), ph); }
   return { pages, N: pages.length };
 }
 const pageHtml = (blks, i, N, tag) => `<div class="page"><div class="pg-body">${blks.join('')}</div><div class="pg-foot"><span>Sayfa ${i + 1} / ${N}</span><span>${tag}</span></div></div>`;
@@ -1672,6 +1690,7 @@ function showPreview(m, from, saved) {
   $('previewScale').innerHTML = curLayout.pages.map((p, i) => pageHtml(p, i, curLayout.N, '')).join('');
   $('pvSave').style.display = saved ? 'none' : '';
   $('pvSavePrint').style.display = saved ? 'none' : '';
+  $('pvSavePdf').style.display = saved ? 'none' : '';
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-onizleme'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   window.scrollTo(0, 0);
@@ -1709,6 +1728,69 @@ function yazdir(copies) {
   window.print();
 }
 window.addEventListener('afterprint', () => { $('printArea').innerHTML = ''; });
+
+/* ============ PDF İndir: PDF uygulamanın içinde üretilir (iPhone/iPad dahil her cihazda aynı A4 çıktı) ============ */
+const PDF_PAGE_H = 990; /* her cihazda bilgisayardaki sayfalama */
+let pdfBusy = false;
+const loadScript = url => new Promise((res, rej) => { const el = document.createElement('script'); el.src = url; el.onload = res; el.onerror = () => rej(new Error('script')); document.head.appendChild(el); });
+async function loadAny(urls, ok) {
+  for (const u of urls) { if (ok()) return; try { await loadScript(u); } catch (e) { /* sıradaki adres denenir */ } }
+  if (!ok()) throw new Error('lib');
+}
+async function pdfLibs() {
+  await loadAny(['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'], () => !!window.html2canvas);
+  await loadAny(['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'], () => !!(window.jspdf && window.jspdf.jsPDF));
+}
+async function uretPdf(m, copies, onProgress) {
+  await pdfLibs();
+  const lay = layoutModel(m, PDF_PAGE_H);
+  const tags = copies === 2 ? ['ASIL', 'SURET'] : [''];
+  const jobs = []; tags.forEach(t => lay.pages.forEach((p, i) => jobs.push(pageHtml(p, i, lay.N, t))));
+  const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+  pdf.setProperties({ title: pdfName(m), subject: 'Gözbir 2027 Sözleşmesi', creator: 'Gözbir Sözleşme Hazırlama' });
+  let stage = $('pdfStage');
+  if (!stage) { stage = document.createElement('div'); stage.id = 'pdfStage'; document.body.appendChild(stage); }
+  try {
+    for (let i = 0; i < jobs.length; i++) {
+      onProgress(i + 1, jobs.length);
+      stage.innerHTML = jobs[i];
+      await new Promise(r => setTimeout(r, 30)); /* ekranın güncellenmesine izin ver */
+      const canvas = await window.html2canvas(stage.firstElementChild, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 1000 });
+      if (i > 0) pdf.addPage('a4', 'portrait');
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      canvas.width = canvas.height = 0;
+    }
+  } finally { stage.innerHTML = ''; }
+  return { blob: pdf.output('blob'), pages: jobs.length };
+}
+async function pdfIndir(copies, kaydet) {
+  if (pdfBusy || !curModel) return;
+  if (kaydet) {
+    if (saveModel()) toast('Sözleşme kaydedildi.');
+    else if (!confirm('Sözleşme kaydedilemedi (tarayıcı hafızası dolu olabilir). Yine de PDF oluşturulsun mu?')) return;
+  }
+  pdfBusy = true;
+  const btns = ['pvSavePdf', 'pvPdf2', 'pvPdf1'].map($); const old = btns.map(b => b.textContent);
+  btns.forEach(b => { b.disabled = true; });
+  const lbl = (i, n) => btns.forEach(b => { b.textContent = 'PDF hazırlanıyor… ' + i + ' / ' + n; });
+  const name = pdfName(curModel) + '.pdf';
+  try {
+    const r = await uretPdf(curModel, copies, lbl);
+    const file = new File([r.blob], name, { type: 'application/pdf' });
+    const mb = (r.blob.size / 1048576).toFixed(1).replace('.', ',');
+    const canShare = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
+    const indir = () => { const u = URL.createObjectURL(r.blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); };
+    const paylas = () => { navigator.share({ files: [file], title: name }).catch(() => {}); };
+    askModal({ title: 'PDF hazır', text: name + ' (' + r.pages + ' sayfa, ' + mb + ' MB)',
+      left: { label: canShare ? 'İndir' : 'Kapat', fn: canShare ? indir : null },
+      right: { label: canShare ? 'Paylaş / Kaydet' : 'İndir', fn: canShare ? paylas : indir } });
+  } catch (e) {
+    toast(e && (e.message === 'lib' || e.message === 'script') ? 'PDF oluşturulamadı: internet bağlantısını kontrol edin.' : 'PDF oluşturulamadı: ' + (e && e.message ? e.message : 'bilinmeyen hata'));
+  } finally { btns.forEach((b, i) => { b.disabled = false; b.textContent = old[i]; }); pdfBusy = false; }
+}
+$('pvSavePdf').addEventListener('click', () => pdfIndir(2, true));
+$('pvPdf2').addEventListener('click', () => pdfIndir(2, false));
+$('pvPdf1').addEventListener('click', () => pdfIndir(1, false));
 $('pvPrint2').addEventListener('click', () => yazdir(2));
 $('pvPrint1').addEventListener('click', () => yazdir(1));
 
