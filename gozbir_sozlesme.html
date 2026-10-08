@@ -215,7 +215,7 @@
   .odt-no { font-size: 0.82rem; font-weight: 700; text-align: center; }
   .odt-bar { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
   .odt-bar .btn { flex: 1 1 0; font-size: 0.78rem; padding: 10px 6px; }
-  .odt-r { display: flex; border: 0.3mm solid #444; border-top: none; height: 6.6mm; line-height: 6.6mm; font-size: 9pt; box-sizing: border-box; }
+  .odt-r { display: flex; border: 0.3mm solid #444; border-top: none; height: 6mm; line-height: 6mm; font-size: 9pt; box-sizing: border-box; }
   .odt-r.odt-h { background: #e6e6e6; font-weight: 700; border-top: 0.3mm solid #444; }
   .odt-r > div { padding: 0 2mm; border-right: 0.3mm solid #444; white-space: nowrap; overflow: hidden; }
   .odt-r > div:last-child { border-right: none; }
@@ -252,6 +252,7 @@
   .odt-cnt .btn { font-size: 0.78rem; padding: 10px 8px; }
   .cb-sec { margin: 16px 0 6px; padding-top: 12px; border-top: 1px dashed var(--border); }
   .cb-sec b { display: block; font-size: 0.95rem; }
+  html.ios .page { height: 282mm; padding-bottom: 14mm; }
   #printArea { display: none; }
   #toast {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -409,6 +410,9 @@ const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABYQAAAHgCAYAAAAVAWkd
 
 /* ============ Yardımcılar ============ */
 const $ = id => document.getElementById(id);
+/* iPhone ve iPad: yazdırma alanı Apple tarafından daraltıldığı için sayfalar daha kısa üretilir (iPadOS bazen Mac gibi görünür) */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (IS_IOS) document.documentElement.classList.add('ios');
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const grp = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const TL = n => grp(n) + ' ₺';
@@ -1552,7 +1556,7 @@ $('btnTemizle').addEventListener('click', () => {
 });
 
 /* ============ Sözleşme blokları ve sayfalama ============ */
-const PAGE_H = 990; // px: bir sayfanın güvenli içerik yüksekliği
+const PAGE_H = IS_IOS ? 955 : 990; // px: bir sayfanın güvenli içerik yüksekliği (iPhone/iPad'de yazdırma alanı daha kısa)
 const PAGE_LBL = ['0.00', '0.25', '0.50', '0.75', '1.00', '1.25', '1.50', '1.75', '2.00', '2.25', '2.50', '2.75', '3.00', '3.25', '3.50'];
 const COL_LBL = ['0.00', '0.25', '0.50', '0.75', '1.00', '1.25', '1.50', '1.75', '2.00'];
 function magnaTable(title, mat) {
