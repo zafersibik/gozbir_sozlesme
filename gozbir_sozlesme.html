@@ -469,19 +469,18 @@ const MADDELER = [
 `ALICI’nın vadesi gelen ödemesini, vade tarihinden itibaren maksimum 15 gün içerisinde de ödememesi halinde, SATICI, herhangi bir bildirim veya ihtara gerek olmaksızın satışı veya ürün teslimini durdurma hakkına sahiptir.`,
 `SATICI, belirlenen aylık taksitlerden herhangi birisinin vadeyi takip eden 30 gün içerisinde ödenmemesi halinde, ödenmemiş bakiyeye, hiçbir ihtar ve ihbara lüzum olmaksızın vade tarihinden itibaren aylık %6 vade farkı tahakkuk ettirerek tahsilatı bekleyebileceği gibi, sözleşmeyi de tek taraflı olarak feshetme hakkına sahiptir.`,
 `Sözleşmeye istinaden verilen hediye ürünlerin kurulumu, garanti ve teknik servisi üretici firmanın sorumluluğundadır. Hediye ürünlerle ilgili SATICI’nın sorumluluğu, yalnızca bu ürünleri sağlam olarak ALICI’ya teslim etmekten ibarettir.`,
-`ALICI’nın temerrüdü, ihmali veya kusuru yüzünden sözleşmenin feshedilmek zorunda kalınması halinde ALICI’ya verilen hediye ürün bedele dönüşür, güncel fiyatı üzerinden ALICI’ya fatura edilerek ALICI’nın cari hesabına borç olarak kaydedilir. Hediye ürün iade alınmaz.`,
-`ALICI’nın temerrüdü, ihmali veya kusuru yüzünden sözleşmenin feshi halinde ALICI, SATICI’ya sözleşme bedelinin %20’si oranında maktu cezai şart ödemeyi kabul ve taahhüt eder. Belirtilen şekilde sözleşmenin feshi halinde, sözleşmede belirtilen ürünlerden teslimi yapılan ürünlerin iskontosu iptal edilir ve iskontolu fiyat ile güncel fiyat arasındaki tutar ALICI’ya ayrıca fatura edilerek ALICI’nın cari hesabına ALICI’nın borcu olarak kaydedilir.`,
-`1.750 TL üstü tüm siparişlerin gönderilmesinden dolayı oluşacak kargo ücretini SATICI karşılayacaktır. Bu tutarın altında kalan siparişlerde, kargo ücreti ALICI’ya aittir. ALICI tarafından SATICI’ya kargo ile gönderilen tüm paketlerin kargo ücreti ALICI tarafından karşılanır. 75.000 TL ve üzeri kampanya anlaşmalarında kargo ücreti SATICI’ya aittir.`,
+`ALICI’nın temerrüdü, ihmali veya kusuru yüzünden sözleşmenin feshedilmek zorunda kalınması halinde, ALICI’ya verilen hediye ürünlerin tamamı bedele dönüşür. Hediye ürünler iade alınmaz; bedelleri fesih tarihindeki güncel liste fiyatı üzerinden ALICI’ya fatura edilerek ALICI’nın cari hesabına borç olarak kaydedilir. Hediye çeki verilmiş ise çekin tutarı ALICI’dan aynen tahsil edilir.`,
+`Sözleşmenin 12. maddede belirtilen şekilde feshi halinde ayrıca: (a) ALICI, SATICI’ya sözleşme bedelinin (sözleşme başındaki “Toplam Tutar”) %20’si oranında maktu cezai şart ödemeyi kabul ve taahhüt eder; (b) sözleşmede belirtilen ürünlerden teslimi yapılan ürünlerin iskontosu iptal edilir ve iskontolu fiyat ile fesih tarihindeki güncel liste fiyatı arasındaki tutar ALICI’ya ayrıca fatura edilerek ALICI’nın cari hesabına borç olarak kaydedilir. Bu maddedeki tutarlar, 12. maddedeki hediye ürün bedeline ek olarak ve birlikte uygulanır.`,
+`1.750 TL üstü tüm siparişlerin gönderilmesinden dolayı oluşacak kargo ücretini SATICI karşılayacaktır. Bu tutarın altında kalan siparişlerde, kargo ücreti ALICI’ya aittir. ALICI tarafından SATICI’ya kargo ile gönderilen tüm paketlerin kargo ücreti ALICI tarafından karşılanır. Aylık ödemesi 75.000 TL ve üzeri olan kampanya anlaşmalarında kargo ücreti SATICI’ya aittir.`,
 `İşbu sözleşme kapsamında taraflar arasında meydana gelen ihtilaflarda münhasıran SATICI’nın ticari defter ve kayıtları yegane delil olarak kabul edilir.`,
 `İşbu sözleşmede hüküm bulunmayan hallerde öncelikle Borçlar Kanunu ve diğer mer’i mevzuat hükümleri uygulanır. Sözleşmenin damga vergisi ALICI’ya aittir.`,
 `İşbu sözleşmeden kaynaklanan ihtilaflarda, İstanbul-Çağlayan Mahkemeleri ve İcra Daireleri yetkilidir.`
 ];
 
 /* Sözleşmenin sabit metni: her kayıtla birlikte saklanır, böylece eski kayıtlar imzalandığı metinle yeniden basılır */
-/* Şirket avukatının eklettiği iki madde: ödeme planı olan kampanyalarda genel hükümlerin sonuna eklenir; {SÜRE} anlaşma süresine göre yazılır */
+/* Şirket avukatının eklettiği süre sonu feshi maddesi: ödeme planı olan kampanyalarda genel hükümlerin sonuna eklenir (eski kayıtlardaki {SÜRE} ifadesi basımda süreye çevrilir) */
 const EK_MADDELER = [
-`Aylık ödemelerden herhangi birisi ödenmediği takdirde, diğer ödemelerin tamamı muaccel hale gelecektir.`,
-`Sözleşme süresi olan {SÜRE} sonunda, başkaca uyarıya gerek olmaksızın sözleşme feshedilmiş sayılır. Taraflar, devam eden dönemde yeni fiyat ve şartlarda yeni bir sözleşme akdedebilir.`
+`Sözleşme, sözleşme başında yazılı bitiş tarihinden itibaren başkaca uyarıya gerek olmaksızın feshedilmiş sayılır. Taraflar, devam eden dönemde yeni fiyat ve şartlarda yeni bir sözleşme akdedebilir.`
 ];
 const SNAP = { baslik: 'AYLIK ALIŞ-VERİŞ BAZLI YAPILAN ANLAŞMA', satici: SATICI + ' (Bundan böyle SATICI diye anılacaktır.)', saticiAdres: SATICI_ADRES, konusu: KONUSU, maddeler: MADDELER, v: 2 };
 
@@ -549,7 +548,7 @@ const CAMPS = [
       }
       return { num: { aylik: r[0], ay: 12 }, evrak: 12, rows };
     },
-    sartlar: [`Hediye Progressive ürünler Premium 1.50 Beyaz / Hybrid verilecektir.`, `Hediye Progressive adetleri yıllıktır. Hediyeler eşit miktarlarda aylık olarak B2B sistemine yüklenecektir.`, YIL, `Kullanılmayan Progressive ürünler devretmeyecektir.`, `Kampanya iptalinde fazla hediye tutarı liste fiyatı üzerinden %50 iskonto ile hesaplanacak fark faturası olarak cariye yansıtılacaktır.`, VADE, `Kampanyalar sözleşme ile yapılacaktır.`] },
+    sartlar: [`Hediye Progressive ürünler Premium 1.50 Beyaz / Hybrid verilecektir.`, `Hediye Progressive adetleri yıllıktır. Hediyeler eşit miktarlarda aylık olarak B2B sistemine yüklenecektir.`, YIL, `Kullanılmayan Progressive ürünler devretmeyecektir.`, `Kampanya iptalinde ALICI’ya yüklenen hediye Progressive ürünlerin tamamı, 12. madde hükmüne göre fesih tarihindeki güncel liste fiyatı üzerinden faturalandırılır.`, VADE, `Kampanyalar sözleşme ile yapılacaktır.`] },
 
   { id: 2, code: 'KMP2', name: 'Elektronik Cihaz Kampanyası', evrak: true,
     steps: [{ key: 'cihaz', label: 'Cihaz ve Aylık Ödeme', opts: () => Object.keys(D2).map(k => [k, D2[k].ad + ' (' + D2[k].kod + ') — ' + TL(D2[k].aylik) + ' / ay — %' + D2[k].isk + ' iskonto']) }],
