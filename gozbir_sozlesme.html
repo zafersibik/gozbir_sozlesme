@@ -171,9 +171,10 @@
   #previewScale .page { margin: 0 0 14px; box-shadow: 0 1px 6px rgba(0,0,0,0.3); }
   .measure { position: absolute; left: -99999px; top: 0; width: 174mm; visibility: hidden; }
   .pg-foot { position: absolute; left: 18mm; right: 18mm; bottom: 8mm; display: flex; justify-content: space-between; font-size: 7.5pt; color: #555; }
-  .blk-logo { display: flex; justify-content: space-between; align-items: center; padding-bottom: 3mm; }
-  .blk-logo img { height: 17mm; width: auto; }
-  .blk-title { text-align: center; font-size: 12pt; font-weight: 700; padding: 1mm 0 4mm; }
+  .blk-logo { display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding-bottom: 4mm; }
+  .blk-logo .lg1 { height: 15mm; width: auto; justify-self: start; }
+  .blk-logo .lg2 { height: 19mm; width: auto; justify-self: end; }
+  .blk-title { text-align: center; font-size: 12pt; font-weight: 700; line-height: 1.25; max-width: 60mm; justify-self: center; }
   .blk-row { display: flex; padding: 0.9mm 0; border-bottom: 0.2mm solid #d9dee3; }
   .blk-row .l { width: 47mm; flex: none; font-weight: 700; }
   .blk-row .c { width: 4mm; flex: none; font-weight: 700; }
@@ -455,28 +456,33 @@ const LS_KAYIT = 'gz_kayit_v1';
 /* ============ Sabit sözleşme metni ============ */
 const SATICI = 'MERVE GÖZLÜK CAMI SANAYİ VE TİC. A.Ş.';
 const SATICI_ADRES = 'Beylikdüzü OSB Mahallesi. Bakır ve Pirinç Sanayi Sit. Açelya Caddesi No:33-1/A Beylikdüzü / İSTANBUL';
-const KONUSU = `SATICI ile ALICI arasında, SATICI'nın üreterek veya ithal ederek portföyünde bulunan ürünlerin ön ödemeli olarak SATICI'nın satışı, ALICI'nın da alım taahhüdüne ilişkin koşulların düzenlenmesidir.`;
+const KONUSU = `SATICI ile ALICI arasında, SATICI’nın üreterek veya ithal ederek portföyünde bulunan ürünlerin ön ödemeli olarak SATICI’nın satışı, ALICI’nın da alım taahhüdüne ilişkin koşulların düzenlenmesidir.`;
 const MADDELER = [
-`SATICI, portföyünde bulundurduğu Fuji, Hawk Plus ve Hawk marka ürünlerini, güncel liste fiyatları üzerinden, sözleşmede belirtilen iskonto oranından indirimli olarak ALICI’ya anlaşma süresince ya da ALICI’nın alacak bakiyesi bitene kadar satmayı taahhüt eder. ALICI da, aynı şekilde işbu sözleşmede yazılı olan ürünleri, sözleşmede yazılı fiyatlardan eksiksiz olarak satın almayı ve bedellerini de yukarıda belirtilen taksitlerde ödemeyi taahhüt etmiştir.`,
+`SATICI, portföyünde bulundurduğu Fuji, Hawk Plus ve Hawk marka ürünlerini, güncel liste fiyatları üzerinden, sözleşmede belirtilen iskonto oranından indirimli olarak ALICI’ya anlaşma süresince ya da ALICI’nın alacak bakiyesi bitene kadar satmayı taahhüt eder. ALICI da aynı şekilde işbu sözleşmede yazılı olan ürünleri, sözleşmede yazılı fiyatlardan eksiksiz olarak satın almayı ve bedellerini de yukarıda belirtilen taksitlerde ödemeyi taahhüt etmiştir.`,
 `SATICI herhangi bir nedenle satışını durdurduğu ürünün tedarikinden mesul değildir. SATICI üretimini veya tedarikini durdurduğu ürün yerine, aynı iskonto üzerinden ALICI’ya muadili veya tamamen farklı bir ürün sunabilir. ALICI, muadili veya tamamen farklı bir ürünü kabul etmez ise, SATICI, satışı durdurduğu ürünler için şayet peşin tahsilat yapmış ise, teslim etmemiş olduğu ürüne karşılık gelen tutarı ALICI’ya bila faiz iade eder.`,
-`SATICI tarafından ‘Paket Cam Kampanyası’ kapsamında piyasaya sunulan özel fiyatlı ürünler, işbu sözleşmeye dahil değildir. Bu ürünler, yalnızca kendi özel paket fiyatları ödenmek suretiyle ayrıca satın alınabilir.`,
-`SATICI’nın müşterilerine uyguladığı kampanya net fiyatlı ürünler, Gözbir üye mağazaları için de geçerli olup, aynı net fiyatlar üzerinden faturalandırılır.`,
+`SATICI tarafından “Paket Cam Kampanyası” kapsamında piyasaya sunulan özel fiyatlı ürünler, işbu sözleşmeye dahil değildir. Bu ürünler, yalnızca kendi özel paket fiyatları ödenmek suretiyle ayrıca satın alınabilir.`,
+`SATICI’nın müşterilerine uyguladığı net fiyatlı kampanya ürünleri, Gözbir üye mağazaları için de geçerli olup aynı net fiyatlar üzerinden faturalandırılır.`,
 `İşbu sözleşme kapsamında belirlenen fiyat, sabit fiyat olmayıp, SATICI, piyasa şartlarına göre sözleşme konusu ürünlerin fiyatlarını artırabilir, değiştirebilir. Ancak, ALICI’nın sözleşme kapsamında liste fiyatı üzerinden kararlaştırılan iskonto hakkı aynen devam eder.`,
 `SATICI, sözleşme süresince %20 artı-eksi olarak her ay ALICI’ya maksimum aylık ödeme tutarı kadar ürün satmayı taahhüt eder. ALICI’nın aylık ödeme tutarını aşan taleplerinde SATICI, bu aşan tutarın peşin olarak ödenmesini veya belirlediği vadeli çek-senet teslimini şart koşabilir.`,
-`ALICI’nın ürün alımlarını üç aylık dönemlerde kontrol edilecektir. ALICI, aylık ortalamada taahhüd ettiği tutarda cam alımı yapmadığı taktirde, SATICI iskonto oranını değiştirme hakkına sahiptir.`,
+`ALICI’nın ürün alımları üç aylık dönemlerde kontrol edilecektir. ALICI, aylık ortalamada taahhüt ettiği tutarda cam alımı yapmadığı takdirde, SATICI iskonto oranını değiştirme hakkına sahiptir.`,
 `Sözleşme konusu hediye/promosyon ürünlerin teslimatları, kampanyaya özel hükümler başlığı altında belirtilmiştir.`,
 `ALICI’nın vadesi gelen ödemesini, vade tarihinden itibaren maksimum 15 gün içerisinde de ödememesi halinde, SATICI, herhangi bir bildirim veya ihtara gerek olmaksızın satışı veya ürün teslimini durdurma hakkına sahiptir.`,
 `SATICI, belirlenen aylık taksitlerden herhangi birisinin vadeyi takip eden 30 gün içerisinde ödenmemesi halinde, ödenmemiş bakiyeye, hiçbir ihtar ve ihbara lüzum olmaksızın vade tarihinden itibaren aylık %6 vade farkı tahakkuk ettirerek tahsilatı bekleyebileceği gibi, sözleşmeyi de tek taraflı olarak feshetme hakkına sahiptir.`,
 `Sözleşmeye istinaden verilen hediye ürünlerin kurulumu, garanti ve teknik servisi üretici firmanın sorumluluğundadır. Hediye ürünlerle ilgili SATICI’nın sorumluluğu, yalnızca bu ürünleri sağlam olarak ALICI’ya teslim etmekten ibarettir.`,
 `ALICI’nın temerrüdü, ihmali veya kusuru yüzünden sözleşmenin feshedilmek zorunda kalınması halinde ALICI’ya verilen hediye ürün bedele dönüşür, güncel fiyatı üzerinden ALICI’ya fatura edilerek ALICI’nın cari hesabına borç olarak kaydedilir. Hediye ürün iade alınmaz.`,
-`ALICI’nın temerrüdü veya ihmali veya da kusuru yüzünden sözleşmenin feshi halinde ALICI, SATICI’ya sözleşme bedelinin %20’si oranında maktu cezai şart ödemeyi kabul ve taahhüt eder. Belirtilen şekilde sözleşmenin feshi halinde, sözleşmede belirtilen ürünlerden teslimi yapılan ürünlerin iskontosu iptal edilir ve iskontolu fiyat ile güncel fiyat arasındaki tutar ALICI’ya ayrıca fatura edilerek ALICI’nın cari hesabına ALICI’nın borcu olarak kaydedilir.`,
-`1.750 TL üstü tüm siparişlerin gönderilmesinden dolayı oluşacak kargo ücretini SATICI karşılayacaktır. Bu tutarın altında kalan siparişlerde, kargo ücreti ALICI’ya aittir. ALICI tarafından SATICI’ya kargo ile gönderilen tüm paketlerin kargo ücreti ALICI tarafından karşılanır. 75.000 TL ve üzerinde kampanya anlaşmalarında kargo ücreti SATICI’ya aittir.`,
+`ALICI’nın temerrüdü, ihmali veya kusuru yüzünden sözleşmenin feshi halinde ALICI, SATICI’ya sözleşme bedelinin %20’si oranında maktu cezai şart ödemeyi kabul ve taahhüt eder. Belirtilen şekilde sözleşmenin feshi halinde, sözleşmede belirtilen ürünlerden teslimi yapılan ürünlerin iskontosu iptal edilir ve iskontolu fiyat ile güncel fiyat arasındaki tutar ALICI’ya ayrıca fatura edilerek ALICI’nın cari hesabına ALICI’nın borcu olarak kaydedilir.`,
+`1.750 TL üstü tüm siparişlerin gönderilmesinden dolayı oluşacak kargo ücretini SATICI karşılayacaktır. Bu tutarın altında kalan siparişlerde, kargo ücreti ALICI’ya aittir. ALICI tarafından SATICI’ya kargo ile gönderilen tüm paketlerin kargo ücreti ALICI tarafından karşılanır. 75.000 TL ve üzeri kampanya anlaşmalarında kargo ücreti SATICI’ya aittir.`,
 `İşbu sözleşme kapsamında taraflar arasında meydana gelen ihtilaflarda münhasıran SATICI’nın ticari defter ve kayıtları yegane delil olarak kabul edilir.`,
 `İşbu sözleşmede hüküm bulunmayan hallerde öncelikle Borçlar Kanunu ve diğer mer’i mevzuat hükümleri uygulanır. Sözleşmenin damga vergisi ALICI’ya aittir.`,
 `İşbu sözleşmeden kaynaklanan ihtilaflarda, İstanbul-Çağlayan Mahkemeleri ve İcra Daireleri yetkilidir.`
 ];
 
 /* Sözleşmenin sabit metni: her kayıtla birlikte saklanır, böylece eski kayıtlar imzalandığı metinle yeniden basılır */
+/* Şirket avukatının eklettiği iki madde: ödeme planı olan kampanyalarda genel hükümlerin sonuna eklenir; {SÜRE} anlaşma süresine göre yazılır */
+const EK_MADDELER = [
+`Aylık ödemelerden herhangi birisi ödenmediği takdirde, diğer ödemelerin tamamı muaccel hale gelecektir.`,
+`Sözleşme süresi olan {SÜRE} sonunda, başkaca uyarıya gerek olmaksızın sözleşme feshedilmiş sayılır. Taraflar, devam eden dönemde yeni fiyat ve şartlarda yeni bir sözleşme akdedebilir.`
+];
 const SNAP = { baslik: 'AYLIK ALIŞ-VERİŞ BAZLI YAPILAN ANLAŞMA', satici: SATICI + ' (Bundan böyle SATICI diye anılacaktır.)', saticiAdres: SATICI_ADRES, konusu: KONUSU, maddeler: MADDELER, v: 2 };
 
 /* ============ Kampanya şartları ============ */
@@ -488,7 +494,7 @@ const STOKSON = `Kampanya stoklarla sınırlı olup, Merve Gözlük Camı San. v
 const machineSartlar = teslim => [
   teslim, NET, VADE,
   `Kampanya sıralı evraklı satış sözleşmesi ile yapılacaktır.`,
-  `Anlaşmanın müşteri tarafından bozulması halinde ilgili cihazın bedeli müşteriye fatura edilerek nakden tahsil edilir.`,
+  `Anlaşmanın ALICI tarafından bozulması halinde ilgili cihazın bedeli ALICI’ya fatura edilerek nakden tahsil edilir.`,
   BORC, STOKSON
 ];
 
@@ -539,11 +545,11 @@ const CAMPS = [
       r[2].forEach((g, i) => rows.push(R(i ? (i + 1) + '. Hediye Ürün Adı' : 'Hediye Ürün Adı', g[0] + ' – ' + g[1] + ' Adet')));
       if (r[2].length) {
         rows.push(M('Hediye Ürün Tutarı', 'hediyeTutar'));
-        rows.push(R('Hediye Ürün Teslimatı', 'Hediye ürün adetleri yıllıktır; eşit miktarlarda aylık olarak B2B sistemine yüklenir.'));
+        rows.push(R('Hediye Ürün Teslimatı', 'Hediye Progressive adetleri yıllıktır; eşit miktarlarda aylık olarak B2B sistemine yüklenir.'));
       }
       return { num: { aylik: r[0], ay: 12 }, evrak: 12, rows };
     },
-    sartlar: [`Hediye Progressive ürünler Premium 1.50 Beyaz / Hybrid verilecektir.`, `Hediye Progressive adetleri yıllıktır. Hediyeler eşit miktarlarda aylık olarak B2B sistemine yüklenecektir.`, YIL, `Kullanılmayan progressive ürünler devir etmeyecektir.`, `Kampanya iptalinde fazla hediye tutarı liste fiyatı üzerinden %50 iskonto ile hesaplanacak fark faturası olarak cariye yansıtılacaktır.`, VADE, `Kampanyalar sözleşme ile yapılacaktır.`] },
+    sartlar: [`Hediye Progressive ürünler Premium 1.50 Beyaz / Hybrid verilecektir.`, `Hediye Progressive adetleri yıllıktır. Hediyeler eşit miktarlarda aylık olarak B2B sistemine yüklenecektir.`, YIL, `Kullanılmayan Progressive ürünler devretmeyecektir.`, `Kampanya iptalinde fazla hediye tutarı liste fiyatı üzerinden %50 iskonto ile hesaplanacak fark faturası olarak cariye yansıtılacaktır.`, VADE, `Kampanyalar sözleşme ile yapılacaktır.`] },
 
   { id: 2, code: 'KMP2', name: 'Elektronik Cihaz Kampanyası', evrak: true,
     steps: [{ key: 'cihaz', label: 'Cihaz ve Aylık Ödeme', opts: () => Object.keys(D2).map(k => [k, D2[k].ad + ' (' + D2[k].kod + ') — ' + TL(D2[k].aylik) + ' / ay — %' + D2[k].isk + ' iskonto']) }],
@@ -578,7 +584,7 @@ const CAMPS = [
 function machineCamp(id) {
   const d = MKG[id];
   const teslimSart = id === 42 ? `Anlaşmaya konu olan cihaz 10 ay içerisinde teslim edilecektir.`
-    : `Anlaşmaya konu olan cihaz; tamamı promosyon ise ${d.teslim.TP} ay, yarı ödemeli ise ${d.teslim.YO} ay içerisinde teslim edilecektir.`;
+    : `Anlaşmaya konu olan cihaz; tamamı promosyon ise ${d.teslim.TP} ay, yarısı ödemeli ise ${d.teslim.YO} ay içerisinde teslim edilecektir.`;
   return { id, code: d.code, name: d.title, evrak: true,
     steps: [{ key: 'tip', label: 'Anlaşma Şekli', opts: () => [['TP', 'Tamamı Promosyon — %55 iskonto'], ['YO', 'Yarısı Ödemeli (' + TL(d.yo.tutar) + ' / ' + d.yo.vade + ' ay vade) — %55 iskonto']] }],
     build: s => {
@@ -1490,6 +1496,7 @@ function buildModel() {
     odeme: c.odemeFixed || S.odeme, ozet: oz ? oz[1] : '',
     baslangic: c.tablo !== false ? S.baslangic : '',
     bitis: c.tablo !== false ? addMonthsIso(S.baslangic, Math.max(1, agreementMonths())) : '',
+    sure: c.tablo !== false ? Math.max(1, agreementMonths()) : null,
     odt: (c.tablo !== false && S.odt) ? { lines: clone(S.odt.lines), tip: S.odeme === 'Kredi Kartı' ? 'kk' : 'evrak' } : null,
     tutar: oz ? parseMoney(oz[1]) : null,
     tutarTuru: S.plan ? 'Ödeme planı toplamı' : (S.num ? 'Aylık anlaşma (aylık × ay)' : 'Peşin ödeme (KDV dahil)'),
@@ -1500,7 +1507,7 @@ function buildModel() {
     cbDuzenlendi: !!(cbActive() && S.cb && S.cb.manual),
     cbFark: (cbActive() && S.cb && S.cb.lines.length !== cbParams().vade) ? 'Cihaz bedeli ödeme sayısı: ' + cbParams().vade + ' → ' + S.cb.lines.length : '',
     ekIskonto: df.ekIsk, farklar: df.farklar, aciklama: S.custom ? String(S.ekAciklama || '').trim() : '',
-    snap: clone(SNAP)
+    snap: (() => { const sp = clone(SNAP); if (c.tablo !== false) sp.maddeler = sp.maddeler.concat(EK_MADDELER); return sp; })()
   };
 }
 $('btnOnizle').addEventListener('click', () => {
@@ -1590,8 +1597,7 @@ function buildBlocks(m, N) {
   const row = (l, v, raw) => add(`<div class="blk-row"><div class="l">${esc(l)}</div><div class="c">:</div><div class="v">${raw ? v : esc(v)}</div></div>`);
   const unvanB = '<b>' + esc(m.unvan) + '</b>';
   const signHtml = v2 ? `<div class="blk-sign"><div><b>SATICI</b>Merve Gözlük Camı San. ve Tic. A.Ş.</div><div><b>ALIM GRUBU</b>Gözbir Gözlük San. ve Tic. A.Ş.</div><div><b>ALICI</b>${esc(m.unvan)}</div></div>` : `<div class="blk-sign"><div><b>SATICI</b>Merve Gözlük Camı San. ve Tic. A.Ş.</div><div><b>ALICI</b>${esc(m.unvan)}</div></div>`;
-  add(`<div class="blk-logo"><img class="lg1" src="${LOGO}" alt="Merve Gözlük Camı"><img class="lg2" src="${LOGO2}" alt="Gözbir"></div>`);
-  add(`<div class="blk-title">${esc(sn.baslik)}</div>`);
+  add(`<div class="blk-logo"><img class="lg1" src="${LOGO}" alt="Merve Gözlük Camı"><div class="blk-title">${esc(sn.baslik)}</div><img class="lg2" src="${LOGO2}" alt="Gözbir"></div>`);
   row('Sözleşme Tarihi', fmtDate(m.tarih));
   row('Satıcı Ünvanı', sn.satici);
   row('Adresi', sn.saticiAdres);
@@ -1610,13 +1616,14 @@ function buildBlocks(m, N) {
   }
   row('Konusu', sn.konusu);
   add(`<div class="blk-h" style="padding-top:5mm">${v2 ? 'HÜKÜMLERİ' : 'HÜKÜMLER'}</div>`, { keep: true });
-  const numM = (n, t) => v2 ? `<div class="blk-m blk-n"><span class="n">${n})</span><span class="t">${esc(t)}</span></div>` : `<div class="blk-m">${n}- ${esc(t)}</div>`;
+  const sureMetni = ay => !ay ? '1 yıl' : (ay % 12 === 0 ? (ay / 12) + ' yıl' : ay + ' ay');
+  const numM = (n, t) => v2 ? `<div class="blk-m blk-n"><span class="n">${n})</span><span class="t">${esc(t.replace('{SÜRE}', sureMetni(m.sure)))}</span></div>` : `<div class="blk-m">${n}- ${esc(t)}</div>`;
   sn.maddeler.forEach((t, i) => add(numM(i + 1, t)));
   if (m.sartlar.length) {
     add(`<div class="blk-h">KAMPANYAYA ÖZEL HÜKÜMLER</div>`, { keep: true });
     m.sartlar.forEach((t, i) => add(numM(sn.maddeler.length + i + 1, t)));
   }
-  add(`<div class="blk-m" style="padding-top:4mm">İşbu ${N} sayfa, ${sn.maddeler.length + m.sartlar.length} özel maddeden ibaret 1 asıl ve 1 suret olarak hazırlanan sözleşme ${fmtDate(m.tarih)} tarihinde İstanbul-Beylikdüzü'nde tanzim ve imza edilmiştir.</div>`, { keep: true });
+  add(`<div class="blk-m" style="padding-top:4mm">İşbu ${N} sayfa, ${sn.maddeler.length + m.sartlar.length} özel maddeden ibaret 1 asıl ve 1 suret olarak hazırlanan sözleşme ${fmtDate(m.tarih)} tarihinde İstanbul-Beylikdüzü’nde tanzim ve imza edilmiştir.</div>`, { keep: true });
   add(signHtml);
   if (m.annex && /^magna[12]$/.test(m.annex)) {
     const pk = m.annex.slice(5);
